@@ -24,7 +24,7 @@ from src.app.core.settings.llm import LLMSettings
 from src.app.exceptions.llm import LLMConfigurationError
 
 
-def create_llm(settings: LLMSettings) -> llm.LLM:
+def create_llm(settings: LLMSettings) -> llm.LLM[Any]:
     if settings.provider == "openai" and not settings.api_key:
         raise LLMConfigurationError("LLM_API_KEY is required when LLM_PROVIDER='openai'.")
     if settings.provider != "openai" and not settings.base_url:

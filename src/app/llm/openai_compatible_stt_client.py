@@ -15,6 +15,7 @@ import wave
 from logging import getLogger
 
 from livekit.agents import APIConnectionError, NotGivenOr, stt, utils
+from livekit.agents.language import LanguageCode
 from livekit.agents.types import NOT_GIVEN, APIConnectOptions
 from openai import AsyncOpenAI, OpenAIError
 
@@ -53,9 +54,10 @@ class OpenAICompatibleSTTClient(STTClient):
         except OpenAIError as exc:
             raise APIConnectionError(f"STT provider request failed: {exc}") from exc
 
+        text = (transcription.text or "").strip()
         return stt.SpeechEvent(
             type=stt.SpeechEventType.FINAL_TRANSCRIPT,
-            alternatives=[stt.SpeechData(language=target_language, text=(transcription.text or "").strip())],
+            alternatives=[stt.SpeechData(language=LanguageCode(target_language), text=text)],
         )
 
     async def aclose(self) -> None:

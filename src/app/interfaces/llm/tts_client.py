@@ -1,9 +1,10 @@
 from abc import ABC
+from typing import Any
 
 from livekit.agents import tts
 
 
-class TTSClient(tts.TTS, ABC):
+class TTSClient(tts.TTS[Any], ABC):
     """The project's text-to-speech port.
 
     Same reasoning as STTClient: one owned name over livekit's contract, no

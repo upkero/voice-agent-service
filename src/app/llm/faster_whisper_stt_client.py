@@ -11,6 +11,7 @@ from logging import getLogger
 from typing import Any
 
 from livekit.agents import APIConnectionError, NotGivenOr, stt, utils
+from livekit.agents.language import LanguageCode
 from livekit.agents.types import NOT_GIVEN, APIConnectOptions
 
 from src.app.core.settings.stt import STTSettings
@@ -76,7 +77,7 @@ class FasterWhisperSTTClient(STTClient):
 
         return stt.SpeechEvent(
             type=stt.SpeechEventType.FINAL_TRANSCRIPT,
-            alternatives=[stt.SpeechData(language=target_language, text=text)],
+            alternatives=[stt.SpeechData(language=LanguageCode(target_language), text=text)],
         )
 
     def _transcribe(self, model: Any, pcm: bytes, language: str) -> str:

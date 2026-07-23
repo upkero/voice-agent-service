@@ -38,17 +38,17 @@ class BookingAgent(Agent):
         return self._flow
 
     @function_tool(raw_schema=CHECK_AVAILABILITY_SCHEMA)
-    async def check_availability(self, ctx: RunContext, raw_arguments: dict[str, Any]) -> dict[str, Any]:
+    async def check_availability(self, ctx: RunContext[Any], raw_arguments: dict[str, Any]) -> dict[str, Any]:
         return await self._booking_tools.check_availability(raw_arguments)
 
     @function_tool(raw_schema=CREATE_BOOKING_SCHEMA)
-    async def create_booking(self, ctx: RunContext, raw_arguments: dict[str, Any]) -> dict[str, Any]:
+    async def create_booking(self, ctx: RunContext[Any], raw_arguments: dict[str, Any]) -> dict[str, Any]:
         return await self._booking_tools.create_booking(raw_arguments)
 
     @function_tool(raw_schema=FIND_BOOKING_SCHEMA)
-    async def find_booking(self, ctx: RunContext, raw_arguments: dict[str, Any]) -> dict[str, Any]:
+    async def find_booking(self, ctx: RunContext[Any], raw_arguments: dict[str, Any]) -> dict[str, Any]:
         return await self._booking_tools.find_booking(raw_arguments)
 
     @function_tool(raw_schema=CANCEL_BOOKING_SCHEMA)
-    async def cancel_booking(self, ctx: RunContext, raw_arguments: dict[str, Any]) -> dict[str, Any]:
+    async def cancel_booking(self, ctx: RunContext[Any], raw_arguments: dict[str, Any]) -> dict[str, Any]:
         return await self._booking_tools.cancel_booking(raw_arguments)

@@ -1,9 +1,10 @@
 from abc import ABC
+from typing import Any
 
 from livekit.agents import stt
 
 
-class STTClient(stt.STT, ABC):
+class STTClient(stt.STT[Any], ABC):
     """The project's speech-to-text port.
 
     It subclasses livekit's `stt.STT` instead of declaring a parallel ABC with a

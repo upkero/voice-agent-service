@@ -7,9 +7,11 @@ whether the layering held.
 """
 
 from logging import getLogger
+from typing import Any
 
 from livekit import rtc
 from livekit.agents import Agent, AgentSession, JobContext, RoomInputOptions
+from livekit.agents import vad as vad_module
 
 from src.app.bootstrap.container import ApplicationContainer
 from src.app.core.settings.agent import get_agent_settings
@@ -39,10 +41,10 @@ def build_agent(container: ApplicationContainer, room_id: str) -> tuple[BookingA
     return BookingAgent(container.dialog_flow, tools), state
 
 
-def build_session(vad: object | None = None) -> AgentSession:
+def build_session(vad: vad_module.VAD | None = None) -> AgentSession[Any]:
     agent_settings = get_agent_settings()
 
-    session = AgentSession(
+    session: AgentSession[Any] = AgentSession(
         vad=vad,
         stt=create_stt(get_stt_settings(), agent_settings.language),
         llm=create_llm(get_llm_settings()),
@@ -59,7 +61,7 @@ def build_session(vad: object | None = None) -> AgentSession:
 
 
 async def start_session(
-    session: AgentSession,
+    session: AgentSession[Any],
     agent: Agent,
     ctx: JobContext,
     notice: DegradationNotice,
@@ -91,7 +93,7 @@ async def start_session(
         raise
 
 
-async def greet(session: AgentSession, agent: BookingAgent, notice: DegradationNotice, room: rtc.Room) -> None:
+async def greet(session: AgentSession[Any], agent: BookingAgent, notice: DegradationNotice, room: rtc.Room) -> None:
     """Speak first.
 
     A voice agent that waits for the guest produces the silence-after-connect

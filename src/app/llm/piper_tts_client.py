@@ -12,7 +12,7 @@ import asyncio
 from logging import getLogger
 from pathlib import Path
 
-from livekit.agents import APIConnectionError, tts
+from livekit.agents import APIConnectionError, tts, utils
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 
 from src.app.core.settings.tts import TTSSettings
@@ -64,7 +64,7 @@ class _PiperStream(tts.ChunkedStream):
             raise APIConnectionError(f"Piper voice not found: {client.model_path}")
 
         output_emitter.initialize(
-            request_id=self._request_id,
+            request_id=utils.shortuuid(),
             sample_rate=settings.sample_rate,
             num_channels=_NUM_CHANNELS,
             # Raw PCM rather than WAV: --output_raw skips the header, and a

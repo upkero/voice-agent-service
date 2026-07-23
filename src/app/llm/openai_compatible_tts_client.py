@@ -13,8 +13,9 @@ other line of this service.
 """
 
 from logging import getLogger
+from typing import Literal
 
-from livekit.agents import APIConnectionError, tts
+from livekit.agents import APIConnectionError, tts, utils
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 from openai import AsyncOpenAI, OpenAIError
 
@@ -26,7 +27,7 @@ logger = getLogger(__name__)
 _NUM_CHANNELS = 1
 # PCM rather than mp3: the pipeline wants raw samples, and asking for a
 # compressed container only to decode it again adds latency to every reply.
-_RESPONSE_FORMAT = "pcm"
+_RESPONSE_FORMAT: Literal["pcm"] = "pcm"
 # What OpenAI-compatible speech endpoints emit for the pcm format.
 _PCM_SAMPLE_RATE = 24000
 
@@ -73,7 +74,7 @@ class _OpenAICompatibleStream(tts.ChunkedStream):
         assert isinstance(client, OpenAICompatibleTTSClient)
 
         output_emitter.initialize(
-            request_id=self._request_id,
+            request_id=utils.shortuuid(),
             sample_rate=_PCM_SAMPLE_RATE,
             num_channels=_NUM_CHANNELS,
             mime_type="audio/pcm",
