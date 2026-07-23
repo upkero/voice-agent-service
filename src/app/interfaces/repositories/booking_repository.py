@@ -21,9 +21,11 @@ class BookingRepository(ABC):
     async def list_available_slots(self, slot_date: date, party_size: int) -> Sequence[SlotDTO]:
         """Slots free on that date with room for the party.
 
-        Filtering by party size here rather than in the service keeps the
-        network payload small: a week of slots is not worth transferring to
-        discard nine tenths of it locally.
+        Party size belongs in the port rather than in the service because it is
+        a data question, not a business rule: a database-backed implementation
+        would answer it with a WHERE clause. That the current implementation has
+        to filter after fetching — ops-core-api offers no capacity query — is a
+        detail of that implementation, which is precisely what a port hides.
         """
 
     @abstractmethod
