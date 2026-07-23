@@ -1,0 +1,55 @@
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    # --dev issues the well-known devkey/secret pair and skips TLS, which is
+    # what makes this stack runnable with no account anywhere. Never run it
+    # this way outside a laptop: those credentials are public knowledge.
+    command: --config /etc/livekit.yaml --dev
+    volumes:
+      - ./config/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"      # signalling (WebSocket) and the management API
+      - "7881:7881"      # ICE over TCP, the fallback when UDP is blocked
+      - "7882:7882/udp"  # ICE over UDP, the normal media path
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7880"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      target: api
+    env_file: .env
+    environment:
+      # Two different addresses for the same server, because two different peers
+      # reach it. The token carries the URL the *browser* must dial (localhost,
+      # from outside the network); the readiness probe runs inside the container
+      # and reaches the server by its service name.
+      LIVEKIT_URL: ${PUBLIC_LIVEKIT_URL:-ws://localhost:7880}
+      LIVEKIT_INTERNAL_URL: ws://livekit:7880
+    depends_on:
+      livekit:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  agent:
+    build:
+      context: .
+      target: agent
+    env_file: .env
+    environment:
+      # The worker registers from inside the network, so it uses the service name.
+      LIVEKIT_URL: ws://livekit:7880
+      # ops-core-api runs from its own compose file. host.docker.internal is the
+      # host as seen from a container on Docker Desktop; on plain Linux add
+      # `extra_hosts: ["host.docker.internal:host-gateway"]` or join its network.
+      CORE_API_BASE_URL: ${CORE_API_BASE_URL:-http://host.docker.internal:8000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      livekit:
+        condition: service_healthy
+    # No ports: the worker dials out to LiveKit and is never dialled itself.

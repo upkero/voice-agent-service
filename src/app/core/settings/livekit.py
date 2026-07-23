@@ -14,7 +14,18 @@ class LiveKitSettings(BaseSettings):
 
     url: str = Field(
         default="ws://localhost:7880",
-        description="LiveKit signalling URL. Inside docker compose use ws://livekit:7880.",
+        description=(
+            "The URL that goes into a join token — the one the *browser* dials. In compose this is the "
+            "host-visible ws://localhost:7880, because the token is used from outside the container network."
+        ),
+    )
+    internal_url: str | None = Field(
+        default=None,
+        description=(
+            "The URL the API process itself uses to reach LiveKit's management API, for the readiness probe. "
+            "Defaults to `url`. They differ whenever the browser and this service sit on different networks: "
+            "in compose the browser dials localhost while the API reaches the server by its service name."
+        ),
     )
     api_key: str = Field(
         default="devkey",

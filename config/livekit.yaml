@@ -1,0 +1,33 @@
+# LiveKit server, development profile.
+#
+# The awkward part of running LiveKit in Docker is ICE: the server advertises
+# the addresses a peer should connect to, and here there are two different
+# peers on two different networks. The browser is on the host and reaches the
+# container through a published port; the agent worker is inside the compose
+# network and reaches it by service name. No single advertised IP is correct
+# for both.
+#
+# The settings below make that a non-problem rather than a compromise:
+#   * use_external_ip: false      — do not advertise a cloud/LAN address that
+#                                   neither peer can route to.
+#   * a published TCP port        — when a UDP candidate fails, both peers fall
+#                                   back to 7881 and media still flows.
+# If UDP is blocked on your machine the call still connects, over TCP.
+
+port: 7880
+
+rtc:
+  udp_port: 7882
+  tcp_port: 7881
+  # Off deliberately: STUN-discovered public addresses are wrong for both peers
+  # in this topology and only add candidates that time out.
+  use_external_ip: false
+
+# Overridden by --dev, which installs devkey/secret. Listed so the pair the
+# rest of the stack is configured with is visible in one place.
+keys:
+  devkey: secret
+
+logging:
+  level: info
+  json: false

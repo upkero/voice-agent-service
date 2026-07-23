@@ -32,8 +32,10 @@ def to_http_url(url: str) -> str:
 
 async def ping_livekit(settings: LiveKitSettings | None = None) -> bool:
     settings = settings or get_livekit_settings()
+    # internal_url, not url: the probe runs server-side, where the address that
+    # goes into a browser's token (often localhost) does not point at the server.
     client = api.LiveKitAPI(
-        url=to_http_url(settings.url),
+        url=to_http_url(settings.internal_url or settings.url),
         api_key=settings.api_key,
         api_secret=settings.api_secret.get_secret_value(),
         timeout=aiohttp.ClientTimeout(total=_PROBE_TIMEOUT_SECONDS),
