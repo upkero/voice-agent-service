@@ -40,7 +40,7 @@ def _fail(msg: str) -> None:
     print(f"{_RED}  FAIL{_OFF} {msg}")
 
 
-async def check_tts() -> bytes:
+async def check_tts() -> tuple[bytes, int]:
     """Synthesise a sentence; return the raw PCM so STT can reuse it."""
     settings = get_tts_settings()
     language = get_agent_settings().language
@@ -56,21 +56,22 @@ async def check_tts() -> bytes:
     if hasattr(tts, "aclose"):
         await tts.aclose()
 
+    # The client's own sample_rate, not the settings value: the OpenAI-compatible
+    # client emits 24 kHz PCM regardless of TTS_SAMPLE_RATE (which is piper-only).
     seconds = len(audio) / (tts.sample_rate * 2)  # 16-bit mono
     if len(audio) == 0:
         _fail("TTS returned no audio")
         raise SystemExit(1)
     _ok(f'spoke "{sentence}" -> {len(audio):,} bytes (~{seconds:.1f}s at {tts.sample_rate} Hz)')
-    return bytes(audio)
+    return bytes(audio), tts.sample_rate
 
 
-async def check_stt(pcm: bytes) -> None:
+async def check_stt(pcm: bytes, sample_rate: int) -> None:
     """Feed the TTS audio back in and confirm it transcribes to words."""
     settings = get_stt_settings()
     language = get_agent_settings().language
     print(f"{_DIM}STT  {settings.provider} / {settings.model}{_OFF}")
 
-    sample_rate = get_tts_settings().sample_rate
     frame = rtc.AudioFrame(
         data=pcm,
         sample_rate=sample_rate,
@@ -127,8 +128,8 @@ async def check_llm_tool_call() -> None:
 async def main() -> None:
     print("Checking the configured providers end to end...\n")
     try:
-        pcm = await check_tts()
-        await check_stt(pcm)
+        pcm, sample_rate = await check_tts()
+        await check_stt(pcm, sample_rate)
         await check_llm_tool_call()
     except SystemExit:
         print(f"\n{_RED}One or more providers failed. Fix the key/model above and re-run.{_OFF}")

@@ -195,6 +195,30 @@ uv run pytest --cov=src/app/services --cov-report=term-missing
 port is replaced with an in-memory fake (its second implementation), so the whole suite runs
 offline. CI runs the same four commands on every push.
 
+### Pre-flight: check the live providers
+
+The unit suite runs offline against fakes. To prove the *configured* LLM/STT/TTS actually work —
+before trying a voice call — run the provider check. It synthesises a sentence with the real TTS,
+feeds that audio straight back into the real STT, and sends the real tool schemas to the LLM, so a
+green run means the whole audio round-trip and tool-calling work end to end, no microphone needed:
+
+```bash
+uv run python -m scripts.check_providers
+```
+
+```
+PASS spoke "Do you have a table for four?" -> 104,160 bytes (~2.2s at 24000 Hz)
+PASS heard back: "Do you have a table for four?"
+PASS model called: check_availability  args={"booking_date":"2026-07-24","party_size":4,...}
+```
+
+### Talking to her without a browser
+
+`python -m src.entrypoint console` runs the agent in the terminal against your local microphone
+and speakers — no LiveKit server, no token, no browser. The fastest way to actually hear her.
+(Run it on the host, not in Docker: a container has no audio devices. Booking still needs
+ops-core-api up; without it she says she can't reach the diary — the degradation path, live.)
+
 ## Out of scope (by choice)
 
 Named so they read as decisions, not oversights: no barge-in tuning beyond Silero's defaults; no
