@@ -1,7 +1,7 @@
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.app.core.request_id import get_request_id
@@ -18,7 +18,7 @@ class _JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         record.message = record.getMessage()
         data: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.message,

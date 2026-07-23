@@ -33,7 +33,10 @@ class STTSettings(BaseSettings):
     )
     base_url: str | None = Field(
         default=None,
-        description="OpenAI-compatible audio API root, e.g. https://openrouter.ai/api/v1. Required for openai_compatible.",
+        description=(
+            "OpenAI-compatible audio API root, e.g. https://openrouter.ai/api/v1. "
+            "Required when provider='openai_compatible'."
+        ),
     )
     api_key: str | None = Field(
         default=None,

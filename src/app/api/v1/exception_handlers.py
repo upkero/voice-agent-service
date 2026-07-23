@@ -24,6 +24,21 @@ def _error_response(
     )
 
 
+def error_response_from_exception(
+    exc: BaseAppException,
+    headers: dict[str, str] | None = None,
+) -> JSONResponse:
+    """Render an app exception into the uniform error envelope.
+
+    Public because middleware cannot rely on the registered exception handlers:
+    those live in Starlette's ExceptionMiddleware, which sits *inside* the HTTP
+    middleware stack, so an exception raised in a middleware propagates past it
+    and surfaces as a 500. Middleware therefore builds its response here instead,
+    keeping a single place that knows the envelope format.
+    """
+    return _error_response(exc.status_code, exc.detail, exc.error_code, headers=headers)
+
+
 async def handle_app_exception(request: Request, exc: BaseAppException) -> JSONResponse:
     if exc.status_code >= 500:
         logger.error(
@@ -33,21 +48,21 @@ async def handle_app_exception(request: Request, exc: BaseAppException) -> JSONR
             exc.detail,
             exc_info=exc,
         )
-    return _error_response(exc.status_code, exc.detail, exc.error_code)
+    return error_response_from_exception(exc)
 
 
 async def handle_request_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
     logger.warning("Request validation error on %s %s", request.method, request.url.path)
     errors = exc.errors()
     for err in errors:
-        if ctx := err.get("ctx"):
-            if isinstance(ctx.get("error"), Exception):
-                ctx["error"] = str(ctx["error"])
+        if (ctx := err.get("ctx")) and isinstance(ctx.get("error"), Exception):
+            ctx["error"] = str(ctx["error"])
     return _error_response(422, errors, "request_validation_error")
 
 
 async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-    return _error_response(exc.status_code, exc.detail, "http_error", headers=exc.headers)
+    headers = dict(exc.headers) if exc.headers else None
+    return _error_response(exc.status_code, exc.detail, "http_error", headers=headers)
 
 
 async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
@@ -56,7 +71,7 @@ async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONR
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    app.add_exception_handler(BaseAppException, handle_app_exception)
-    app.add_exception_handler(RequestValidationError, handle_request_validation_error)
-    app.add_exception_handler(StarletteHTTPException, handle_http_exception)
+    app.add_exception_handler(BaseAppException, handle_app_exception)  # type: ignore[arg-type]
+    app.add_exception_handler(RequestValidationError, handle_request_validation_error)  # type: ignore[arg-type]
+    app.add_exception_handler(StarletteHTTPException, handle_http_exception)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, handle_unexpected_exception)
