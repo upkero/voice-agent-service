@@ -82,6 +82,13 @@ class DialogSessionState:
         the identifier with no name matching and no chance of reaching somebody
         else's table.
         """
+        # A replayed booking is the same booking. Issuing it a second reference
+        # would show the model two reservations where the guest has one, and
+        # invite it to offer to cancel a table that does not separately exist.
+        for existing_ref, existing in self._bookings.items():
+            if existing.id == booking.id:
+                return self._summaries[existing_ref]
+
         ref = f"booking_{len(self._bookings) + 1}"
         summary = BookingSummary(
             ref=ref,
