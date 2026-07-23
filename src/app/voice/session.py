@@ -56,6 +56,19 @@ def build_session(vad: vad_module.VAD | None = None) -> AgentSession[Any]:
         # Two tool steps per turn: check availability, then answer. Booking is a
         # separate turn by design, because the guest has to agree in between.
         max_tool_steps=2,
+        # Endpointing is the single largest slice of perceived latency, and none
+        # of it is provider time. After the guest stops talking the session waits
+        # to be sure they are done; the turn-detection model is least sure
+        # exactly when a booking utterance ends — on a date or a number
+        # ("...for the 24th") — so it sits out the whole max delay. A restaurant
+        # booking is short and turn-based, so we cap that wait hard rather than
+        # leave the six-second default in place.
+        min_endpointing_delay=0.4,
+        max_endpointing_delay=2.0,
+        # Start drafting the reply (and any tool call) while the final transcript
+        # is still settling, instead of after. Overlaps the LLM with the tail of
+        # STT, which is free latency back on a sequential cloud pipeline.
+        preemptive_generation=True,
     )
     return session
 
