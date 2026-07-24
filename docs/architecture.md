@@ -62,5 +62,27 @@ transport apart — the Adapter pattern doing exactly what it is for.
 | **Adapter** | `repositories/core_api_booking.py` | Makes an HTTP service satisfy a database-shaped port. |
 | **Adapter** | `llm/faster_whisper_stt_client.py`, `llm/piper_tts_client.py` | Wrap a local model / local binary behind livekit's `stt.STT` / `tts.TTS`. |
 | **Factory** | `llm/factory.py`, `llm/stt_factory.py`, `llm/tts_factory.py` | The one place each provider client is built; provider chosen by settings, never by calling code. |
+| **Strategy (fallback)** | `stt.FallbackAdapter` / `tts.FallbackAdapter` wired in the factories | A configured `*_FALLBACK_PROVIDER` pairs two implementations; the session fails a streaming primary over to a batch fallback at runtime. |
+
+### Streaming vs batch is a declared capability, not a branch
+
+STT providers span both modes and the app never branches on which: each client
+declares `STTCapabilities(streaming=...)`, and `AgentSession` drives it
+accordingly — a batch client is wrapped in the session's own VAD segmenter, a
+streaming one is fed live over `stream()`. Adding a streaming provider changes
+no code in `services/`, `voice/` or `api/`.
+
+| `STT_PROVIDER` | Mode | Where it runs |
+|---|---|---|
+| `faster_whisper` | batch | local, in-process |
+| `openai_compatible` | batch | OpenRouter / OpenAI REST |
+| `deepgram` | **streaming** | Deepgram WebSocket (plugin, used directly) |
+| `whisper_stream` | **streaming** | self-hosted WhisperLive, a peer service by URL |
+
+`TTS_PROVIDER` is `piper` (local), `openai_compatible` (batch REST), or
+`cartesia` (streaming WebSocket). The self-hosted WhisperLive server is a peer
+service reached by URL — the same shape as ops-core-api — so it is a
+docker-compose profile locally and a separate GPU instance in production, with
+no code difference.
 | **Strategy** | `interfaces/booking/slot_ranking_strategy.py` + `services/booking/ranking.py` | How free slots are ranked against a requested time; a second rule adds a class, not an `if`. |
 | **Template Method** | `services/dialog/flow.py` | Fixes the order of the system prompt's sections; a subclass overrides a step but cannot reshuffle the skeleton. |

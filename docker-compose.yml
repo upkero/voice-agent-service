@@ -35,6 +35,28 @@ services:
     ports:
       - "8080:8080"
 
+  # Self-hosted streaming STT, opt-in. `docker compose up` stays light; add it
+  # with `docker compose --profile selfhost-stt up`. The agent reaches it by URL
+  # (STT_WHISPER_STREAM_URL=ws://whisper:9090 with STT_PROVIDER=whisper_stream),
+  # so in production it moves to its own GPU instance unchanged — a peer service,
+  # not part of the app. WhisperLive does LocalAgreement streaming over faster-whisper.
+  whisper:
+    profiles: ["selfhost-stt"]
+    # CPU image by default. For the GPU box use ghcr.io/collabora/whisperlive-gpu
+    # and the deploy.resources block below. Pin the tag before deploying; verify
+    # against the WhisperLive release you run.
+    image: ${WHISPERLIVE_IMAGE:-ghcr.io/collabora/whisperlive-cpu:latest}
+    ports:
+      - "9090:9090"
+    # GPU (uncomment with the -gpu image):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
   agent:
     build:
       context: .
