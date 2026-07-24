@@ -4,7 +4,12 @@ from typing import Literal
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-TTSProvider = Literal["piper", "openai_compatible"]
+# Ways to turn text into speech:
+#   piper              - local binary, offline, no key (default)
+#   openai_compatible  - batch REST (OpenRouter/OpenAI): first audio byte in ~2-3s
+#   cartesia           - streaming over Cartesia's WebSocket, ~90ms to first byte (needs key)
+# Cartesia is the low-latency path; the others buffer more before the first sound.
+TTSProvider = Literal["piper", "openai_compatible", "cartesia"]
 
 # Per-language default voices, used when TTS_VOICE is unset. Both are baked
 # into the agent image at build time, so switching AGENT_LANGUAGE needs no
@@ -20,16 +25,24 @@ class TTSSettings(BaseSettings):
 
     provider: TTSProvider = Field(
         default="piper",
-        description="piper runs locally with no API key; openai_compatible calls any OpenAI-shaped speech API.",
+        description="Which TTS implementation to build. cartesia is streaming and low-latency.",
+    )
+    fallback_provider: TTSProvider | None = Field(
+        default=None,
+        description=(
+            "Optional second provider, wrapped with the primary in a FallbackAdapter. If the primary "
+            "(e.g. streaming cartesia) fails, the session fails over to this one. Pair a streaming "
+            "primary with a local piper fallback so a provider outage degrades to an offline voice."
+        ),
     )
     voice: str | None = Field(
         default=None,
-        description="piper: voice name, e.g. ru_RU-irina-medium. Unset picks the default for AGENT_LANGUAGE.",
+        description="Voice name for the chosen provider. Voice sets differ per provider/model.",
     )
     model: str = Field(
         default="tts-1",
         min_length=1,
-        description="openai_compatible: the provider's speech model name.",
+        description="Model name: the openai_compatible speech model, or the Cartesia model id.",
     )
     base_url: str | None = Field(
         default=None,
@@ -37,7 +50,7 @@ class TTSSettings(BaseSettings):
     )
     api_key: str | None = Field(
         default=None,
-        description="API key for the OpenAI-compatible provider.",
+        description="API key for the cloud provider: the OpenAI-compatible key, or the Cartesia key.",
     )
     binary_path: str = Field(
         default="piper",
@@ -59,12 +72,21 @@ class TTSSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_provider_requirements(self) -> "TTSSettings":
-        if self.provider == "openai_compatible" and not self.base_url:
-            raise ValueError("TTS_BASE_URL is required when TTS_PROVIDER='openai_compatible'.")
+        providers = {self.provider, self.fallback_provider}
+        if "openai_compatible" in providers and not self.base_url:
+            raise ValueError("TTS_BASE_URL is required when TTS uses the openai_compatible provider.")
+        if "cartesia" in providers and not self.api_key:
+            raise ValueError("TTS_API_KEY (a Cartesia key) is required when TTS uses the cartesia provider.")
+        if self.fallback_provider is not None and self.fallback_provider == self.provider:
+            raise ValueError("TTS_FALLBACK_PROVIDER must differ from TTS_PROVIDER.")
         return self
 
     def resolve_voice(self, language: str) -> str:
-        """Explicit voice wins; otherwise the language decides."""
+        """Explicit voice wins; otherwise the language decides.
+
+        The default map holds piper voice names; a cloud provider needs its own
+        voice set via TTS_VOICE, so this only meaningfully defaults for piper.
+        """
         return self.voice or DEFAULT_PIPER_VOICES.get(language, DEFAULT_PIPER_VOICES["en"])
 
 
