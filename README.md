@@ -121,35 +121,63 @@ curl 'http://localhost:8000/api/v1/booking-slots?date=<tomorrow>&resource_type=t
 
 ## Configuring speech (STT and TTS are independent)
 
-Recognition and synthesis are two separate ports with two separate settings blocks. Any
-combination is supported — local recognition with a cloud voice, or the reverse.
+Recognition and synthesis are two separate ports with two separate settings blocks, each with
+several providers picked by one env var. Any combination is supported — local recognition with a
+cloud voice, streaming STT with a batch TTS, and so on. **Whether a provider streams is not a
+branch anywhere in the app**: each client declares its capability and `AgentSession` drives it,
+wrapping a batch client in its own VAD segmenter and feeding a streaming one live.
 
-| | Default (offline) | Cloud alternative |
-|---|---|---|
-| **STT** | `STT_PROVIDER=faster_whisper` (local Whisper, CPU) | `STT_PROVIDER=openai_compatible` + `STT_BASE_URL` / `STT_API_KEY` / `STT_MODEL` |
-| **TTS** | `TTS_PROVIDER=piper` (local voices) | `TTS_PROVIDER=openai_compatible` + `TTS_BASE_URL` / `TTS_API_KEY` / `TTS_MODEL` |
+| `STT_PROVIDER` | Mode | Latency after speech | Needs |
+|---|---|---|---|
+| `faster_whisper` | batch, local | ~1-2s (CPU) | nothing — offline default |
+| `openai_compatible` | batch REST | ~2s/clip | `STT_BASE_URL` / `STT_API_KEY` / `STT_MODEL` (OpenRouter, OpenAI, …) |
+| `deepgram` | **streaming** | ~150-300ms | a Deepgram key in `STT_API_KEY`, `STT_MODEL=nova-3` |
+| `whisper_stream` | **streaming** | ~1s on GPU | `STT_WHISPER_STREAM_URL` → a self-hosted WhisperLive |
 
-The cloud clients are **provider-agnostic**: nothing in the code names a provider. `*_BASE_URL`
-selects it, so the same client points at OpenRouter, OpenAI, or a self-hosted server that
-implements the OpenAI audio contract (`/audio/transcriptions`, `/audio/speech`).
+| `TTS_PROVIDER` | Mode | First byte | Needs |
+|---|---|---|---|
+| `piper` | local | ~150ms | nothing — offline default |
+| `openai_compatible` | batch REST | ~2-3s | `TTS_BASE_URL` / `TTS_API_KEY` / `TTS_MODEL` / `TTS_VOICE` |
+| `cartesia` | **streaming** | ~90ms | a Cartesia key in `TTS_API_KEY`, `TTS_MODEL=sonic-2`, a Cartesia `TTS_VOICE` |
+
+The OpenAI-compatible clients are **provider-agnostic**: nothing in the code names a provider,
+`*_BASE_URL` selects it, so the same client points at OpenRouter, OpenAI, or any server
+implementing `/audio/transcriptions` and `/audio/speech`. OpenRouter is batch REST only — for true
+streaming (near-zero STT latency, ~90ms TTS) use `deepgram` / `cartesia`, whose LiveKit plugins hit
+the providers' native WebSockets.
+
+### Fallback: prefer streaming, degrade gracefully
+
+Set `STT_FALLBACK_PROVIDER` / `TTS_FALLBACK_PROVIDER` and the two providers are wrapped in a
+`FallbackAdapter`: if the streaming primary fails at connect time, the session fails over to the
+secondary per request. A production pairing is a streaming primary with a resilient fallback —
+`STT_PROVIDER=deepgram` + `STT_FALLBACK_PROVIDER=openai_compatible`, or
+`TTS_PROVIDER=cartesia` + `TTS_FALLBACK_PROVIDER=piper` so a provider outage drops to the offline
+voice instead of to silence.
+
+### Self-hosted streaming STT
+
+`whisper_stream` talks to a [WhisperLive](https://github.com/collabora/WhisperLive) server, which
+streams real transcripts (rolling buffer + LocalAgreement, so context survives across chunks — not
+naive slicing). It is a **peer service reached by URL**, the same shape as ops-core-api:
+
+```bash
+docker compose --profile selfhost-stt up   # runs WhisperLive at ws://whisper:9090 locally
+# then: STT_PROVIDER=whisper_stream, STT_WHISPER_STREAM_URL=ws://whisper:9090
+```
+
+In production it moves to its own instance unchanged (just a different URL). Its latency tracks the
+host: ~1s on a GPU, slower than batch on a small CPU — so it belongs on a GPU box, while Deepgram
+gives the same streaming latency with no infra.
 
 ### Adding a provider that is *not* OpenAI-compatible
 
-A vendor with its own request shape (Cartesia, say) is not covered by `openai_compatible` — being
-audio does not make it OpenAI-shaped. It is a new class implementing the same `TTSClient` port
-plus one branch in the factory, and nothing else in the service changes (Open/Closed):
-
-```python
-# src/app/llm/cartesia_tts_client.py
-class CartesiaTTSClient(TTSClient): ...      # implement synthesize() against Cartesia's API
-
-# src/app/llm/tts_factory.py — one new branch
-if settings.provider == "cartesia":
-    return CartesiaTTSClient(settings, voice)
-```
-
-Add `"cartesia"` to `TTSProvider` in `core/settings/tts.py` and it is selectable by config. It is
-left unbuilt on purpose: a third demo product costs image size for no extra teaching value.
+Cartesia has its own request shape — being audio does not make it OpenAI-shaped. It is not a
+variant of the OpenAI-compatible client but its own selectable provider: one branch in
+`llm/tts_factory.py` (its LiveKit plugin already satisfies the `tts.TTS` port, so no wrapper) plus
+`"cartesia"` in the `TTSProvider` literal. Nothing in `services/`, `voice/` or `api/` changes —
+grep the tree for `cartesia` and it appears only in the factory and settings. That is Open/Closed,
+and it is checkable.
 
 ## How degradation behaves
 
