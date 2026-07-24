@@ -46,7 +46,10 @@ def build_session(vad: vad_module.VAD | None = None) -> AgentSession[Any]:
 
     session: AgentSession[Any] = AgentSession(
         vad=vad,
-        stt=create_stt(get_stt_settings(), agent_settings.language),
+        # The VAD is handed to the STT factory too: when a fallback is configured
+        # it wraps the two providers in a FallbackAdapter, which needs a VAD to
+        # segment any batch member into the streaming interface.
+        stt=create_stt(get_stt_settings(), agent_settings.language, vad=vad),
         llm=create_llm(get_llm_settings()),
         tts=create_tts(get_tts_settings(), agent_settings.language),
         # A guest interrupting the agent mid-sentence is normal on a phone call

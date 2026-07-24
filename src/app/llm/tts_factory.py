@@ -1,30 +1,52 @@
 """Factory for the text-to-speech client.
 
-Adding a provider that is not OpenAI-compatible — Cartesia, ElevenLabs, a
-vendor with its own request shape — is a new class implementing TTSClient plus
-one branch here. Nothing in services/, voice/ or api/ changes, because nothing
-there names a provider. That is the Open/Closed claim, and it is checkable:
-grep the rest of the tree for "piper" and it appears only in settings defaults.
+Three providers:
+
+    piper              local binary     (own TTSClient, offline)
+    openai_compatible  batch REST       (own TTSClient, OpenRouter/OpenAI)
+    cartesia           streaming WS     (the livekit plugin, used directly)
+
+Adding a provider is a branch here plus, only if it is not already an
+stt/tts.TTS, a class implementing the TTSClient port. Cartesia's plugin already
+is a tts.TTS, so it is constructed directly. Nothing in services/, voice/ or
+api/ names a provider — grep the tree for "cartesia" and it appears only here
+and in settings. That is the Open/Closed claim, and it is checkable.
 """
 
 from logging import getLogger
+from typing import Any
 
-from src.app.core.settings.tts import TTSSettings
-from src.app.interfaces.llm.tts_client import TTSClient
+from livekit.agents import tts
+
+from src.app.core.settings.tts import TTSProvider, TTSSettings
 
 logger = getLogger(__name__)
 
 
-def create_tts(settings: TTSSettings, language: str) -> TTSClient:
-    voice = settings.resolve_voice(language)
+def create_tts(settings: TTSSettings, language: str) -> tts.TTS[Any]:
+    """Build the TTS the session will use, with an optional fallback.
 
-    if settings.provider == "piper":
+    A streaming primary (cartesia) paired with a local piper fallback means a
+    provider outage degrades to an offline voice rather than to silence.
+    """
+    primary = _build_one(settings.provider, settings, language)
+    if settings.fallback_provider is None:
+        return primary
+
+    fallback = _build_one(settings.fallback_provider, settings, language)
+    logger.info("TTS fallback enabled: %s -> %s", settings.provider, settings.fallback_provider)
+    return tts.FallbackAdapter([primary, fallback])
+
+
+def _build_one(provider: TTSProvider, settings: TTSSettings, language: str) -> tts.TTS[Any]:
+    if provider == "piper":
         from src.app.llm.piper_tts_client import PiperTTSClient
 
+        voice = settings.resolve_voice(language)
         logger.info("TTS: piper voice %s", voice)
         return PiperTTSClient(settings, voice)
 
-    if settings.provider == "openai_compatible":
+    if provider == "openai_compatible":
         from openai import AsyncOpenAI
 
         from src.app.llm.openai_compatible_tts_client import OpenAICompatibleTTSClient
@@ -36,8 +58,23 @@ def create_tts(settings: TTSSettings, language: str) -> TTSClient:
             timeout=settings.timeout_seconds,
             max_retries=settings.max_retries,
         )
-        # A cloud voice name is not a piper voice name, so the default map is
-        # only consulted for piper; anything else must be set explicitly.
+        # A cloud voice name is not a piper voice name, so the default map is not
+        # consulted here; the provider's own voice must be set explicitly.
         return OpenAICompatibleTTSClient(settings, settings.voice or "alloy", client)
 
-    raise ValueError(f"Unsupported TTS provider: {settings.provider}")
+    if provider == "cartesia":
+        from livekit.plugins import cartesia
+
+        # Streaming, ~90ms to first byte. sonic is Cartesia's low-latency model.
+        model = settings.model if settings.model != "tts-1" else "sonic-2"
+        # Guaranteed by TTSSettings validation.
+        assert settings.api_key is not None
+        logger.info("TTS: Cartesia %s (streaming, %s)", model, language)
+        # kwargs typed Any so the optional voice can be omitted (letting the
+        # plugin's default stand) without tripping the typed constructor.
+        kwargs: dict[str, Any] = {"model": model, "language": language, "api_key": settings.api_key}
+        if settings.voice:
+            kwargs["voice"] = settings.voice
+        return cartesia.TTS(**kwargs)
+
+    raise ValueError(f"Unsupported TTS provider: {provider}")
