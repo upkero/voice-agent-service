@@ -95,7 +95,12 @@ class _WhisperLiveStream(stt.SpeechStream):
 
     async def _run(self) -> None:
         try:
-            async with websockets.connect(self._url, max_size=None) as ws:
+            # ping_interval=None: WhisperLive loads the Whisper model on the first
+            # connection (slow on CPU, and it blocks the server's thread), so the
+            # default client keepalive would tear the socket down mid-load before
+            # SERVER_READY ever arrives. A GPU server is fast, but a cold or busy
+            # one must not be killed by our own ping timer.
+            async with websockets.connect(self._url, max_size=None, ping_interval=None) as ws:
                 await ws.send(
                     json.dumps(
                         {
@@ -155,6 +160,13 @@ class _WhisperLiveStream(stt.SpeechStream):
         carries a 'completed' flag once LocalAgreement has committed it. We emit
         each newly completed segment once as a final, and the tail of not-yet-
         committed text as a single interim.
+
+        Verified against a live WhisperLive server: a segment flips to
+        'completed' only once the *next* utterance begins, so the last thing a
+        caller says stays interim until they speak again. That is expected, not a
+        gap — the AgentSession commits the turn from the latest interim via its
+        own VAD endpointing (min/max_endpointing_delay in session.py), exactly as
+        it does for any streaming STT. The final is a fast-path, not the only path.
         """
         completed = [s for s in segments if s.get("completed")]
         for segment in completed[self._finalized :]:
