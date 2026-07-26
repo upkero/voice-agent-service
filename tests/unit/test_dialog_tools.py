@@ -111,10 +111,13 @@ async def test_a_blank_guest_name_is_refused(tools) -> None:
 
 async def test_an_outage_becomes_a_sentence_rather_than_an_exception(agent_settings, state) -> None:
     """A tool that raises is dead air, and dead air reads as a dropped call."""
+    # Inject the fixed clock like the shared `tools` fixture, so TOMORROW stays
+    # a future date whatever the real calendar says when the suite runs.
     tools = BookingTools(
         ReservationService(UnavailableBookingRepository(), NearestTimeRanking()),
         state,
         agent_settings,
+        today=lambda: TOMORROW - timedelta(days=1),
     )
 
     result = await tools.check_availability(dict(VALID_AVAILABILITY))
