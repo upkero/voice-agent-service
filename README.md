@@ -1,5 +1,9 @@
 # voice-agent-service
 
+[![CI](https://github.com/upkero/voice-agent-service/actions/workflows/ci.yml/badge.svg)](https://github.com/upkero/voice-agent-service/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+
 A real LiveKit voice agent that books restaurant tables by phone. Persona: **Мила**, a
 receptionist for a fictional restaurant. She listens, speaks, and calls typed tools to check
 availability and take a booking against [`ops-core-api`](../ops-core-api) — a genuine WebRTC

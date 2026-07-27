@@ -2,6 +2,10 @@
 name = "voice-agent-service"
 version = "0.1.0"
 description = "LiveKit voice agent for restaurant table booking, with deterministic LLM tool-calling"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "upkero" }]
+keywords = ["livekit", "voice-agent", "speech-to-text", "text-to-speech", "tool-calling"]
 requires-python = ">=3.12"
 dependencies = [
     "fastapi[standard]>=0.115.0",
