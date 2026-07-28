@@ -17,6 +17,7 @@ from src.app.exceptions.booking import (
     IdempotencyKeyConsumedError,
     SlotTakenError,
 )
+from src.app.interfaces.livekit_gateway import LiveKitGateway
 from src.app.interfaces.repositories.booking_repository import BookingRepository
 
 TOMORROW = date(2026, 7, 24)
@@ -161,6 +162,20 @@ class CancelledReplayRepository(FakeBookingRepository):
             party_size=party_size,
             status=BookingStatus.CANCELLED,
         )
+
+
+class FakeLiveKitGateway(LiveKitGateway):
+    """Readiness without a LiveKit server on the other end.
+
+    The reason the probe became a port: before it did, /health/ready could only
+    be exercised by standing one up.
+    """
+
+    def __init__(self, reachable: bool = True) -> None:
+        self.reachable = reachable
+
+    async def ping(self) -> bool:
+        return self.reachable
 
 
 class FakeRoom:

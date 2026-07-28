@@ -7,6 +7,9 @@ checked here is the wiring, which unit tests of the service cannot see.
 import jwt
 import pytest
 
+from src.app.api.v1.dependencies import get_livekit_gateway
+from tests.fakes import FakeLiveKitGateway
+
 SECRET = "test-livekit-secret-value-at-least-32-bytes"
 
 
@@ -15,6 +18,24 @@ async def test_liveness_is_open_and_cheap(client) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+async def test_readiness_is_ok_when_livekit_answers(app, client) -> None:
+    app.dependency_overrides[get_livekit_gateway] = lambda: FakeLiveKitGateway(reachable=True)
+
+    response = await client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+async def test_readiness_is_503_when_livekit_is_unreachable(app, client) -> None:
+    """A token for a room nobody can join is worse than an honest 503."""
+    app.dependency_overrides[get_livekit_gateway] = lambda: FakeLiveKitGateway(reachable=False)
+
+    response = await client.get("/health/ready")
+
+    assert response.status_code == 503
 
 
 async def test_a_token_can_be_issued_with_no_body_fields(client) -> None:

@@ -12,7 +12,9 @@ from functools import cached_property
 from src.app.core.settings.agent import get_agent_settings
 from src.app.core.settings.core_api import get_core_api_settings
 from src.app.core.settings.livekit import get_livekit_settings
+from src.app.gateways.livekit_probe import LiveKitApiGateway
 from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
+from src.app.interfaces.livekit_gateway import LiveKitGateway
 from src.app.interfaces.repositories.booking_repository import BookingRepository
 from src.app.repositories.core_api_booking import create_booking_repository
 from src.app.services.booking.ranking import NearestTimeRanking
@@ -25,6 +27,10 @@ class ApplicationContainer:
     @cached_property
     def access_token_service(self) -> AccessTokenService:
         return AccessTokenService(get_livekit_settings())
+
+    @cached_property
+    def livekit_gateway(self) -> LiveKitGateway:
+        return LiveKitApiGateway(get_livekit_settings())
 
     @cached_property
     def booking_repository(self) -> BookingRepository:

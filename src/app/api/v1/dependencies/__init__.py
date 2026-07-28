@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 from src.app.bootstrap.container import ApplicationContainer
+from src.app.interfaces.livekit_gateway import LiveKitGateway
 from src.app.services.token.access_token_service import AccessTokenService
 
 
@@ -19,5 +20,10 @@ def get_access_token_service(request: Request) -> AccessTokenService:
     return get_container(request).access_token_service
 
 
+def get_livekit_gateway(request: Request) -> LiveKitGateway:
+    return get_container(request).livekit_gateway
+
+
 ContainerDep = Annotated[ApplicationContainer, Depends(get_container)]
 AccessTokenServiceDep = Annotated[AccessTokenService, Depends(get_access_token_service)]
+LiveKitGatewayDep = Annotated[LiveKitGateway, Depends(get_livekit_gateway)]
