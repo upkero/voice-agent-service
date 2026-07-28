@@ -10,9 +10,14 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 
 from src.app.api.v1.dependencies import get_livekit_gateway
+from src.app.core.settings.livekit import get_livekit_settings
 from tests.fakes import FakeLiveKitGateway
 
-SECRET = "test-livekit-secret-value-at-least-32-bytes"
+# Read from settings rather than repeating the literal from conftest. conftest
+# sets the test values with os.environ.setdefault, which is a no-op when the
+# variable is already exported — CI does export LIVEKIT_API_SECRET. A literal
+# here would then be verifying a token against a secret the app never used.
+SECRET = get_livekit_settings().api_secret.get_secret_value()
 
 
 async def test_liveness_is_open_and_cheap(client: AsyncClient) -> None:
@@ -47,7 +52,7 @@ async def test_a_token_can_be_issued_with_no_body_fields(client: AsyncClient) ->
     body = response.json()
     claims = jwt.decode(body["token"], SECRET, algorithms=["HS256"])
     assert claims["video"]["room"] == body["room_name"]
-    assert body["livekit_url"] == "ws://livekit-test:7880"
+    assert body["livekit_url"] == get_livekit_settings().url
 
 
 async def test_a_requested_room_is_honoured(client: AsyncClient) -> None:
