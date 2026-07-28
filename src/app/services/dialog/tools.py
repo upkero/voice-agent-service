@@ -29,6 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from src.app.contracts.booking import BookingSummary, SlotOffer
 from src.app.core.settings.agent import AgentSettings
 from src.app.exceptions.booking import BookingError
+from src.app.prompts import get_prompt
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.phrases import phrase
 from src.app.services.dialog.session_state import DialogSessionState
@@ -39,6 +40,16 @@ _DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 _TIME_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"
 _SLOT_REF_PATTERN = r"^slot_[1-9]\d*$"
 _BOOKING_REF_PATTERN = r"^booking_[1-9]\d*$"
+
+
+def _text(name: str) -> str:
+    """Every string below that the model reads comes from prompts/.
+
+    A tool `description` is model-facing prose that happens to travel inside a
+    JSON Schema. Leaving it inline would mean half the instructions this agent
+    sends live in prompts/ and the other half in a dict literal.
+    """
+    return get_prompt(name).text
 
 
 # --------------------------------------------------------------------------
@@ -79,28 +90,25 @@ class CancelBookingArgs(_StrictArgs):
 # --------------------------------------------------------------------------
 CHECK_AVAILABILITY_SCHEMA: Final[dict[str, Any]] = {
     "name": "check_availability",
-    "description": (
-        "Look up free tables for a date and party size. Call this before offering any time. "
-        "Returns up to three options, each with a short reference like 'slot_1' used to book it."
-    ),
+    "description": _text("tool_check_availability"),
     "parameters": {
         "type": "object",
         "properties": {
             "booking_date": {
                 "type": "string",
                 "pattern": _DATE_PATTERN,
-                "description": "Calendar date as YYYY-MM-DD. Resolve words like 'today' yourself before calling.",
+                "description": _text("tool_check_availability_booking_date"),
             },
             "party_size": {
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 100,
-                "description": "How many people will be seated.",
+                "description": _text("tool_check_availability_party_size"),
             },
             "preferred_time": {
                 "type": ["string", "null"],
                 "pattern": _TIME_PATTERN,
-                "description": "Requested time as 24-hour HH:MM, or null if the guest has no preference.",
+                "description": _text("tool_check_availability_preferred_time"),
             },
         },
         "required": ["booking_date", "party_size", "preferred_time"],
@@ -110,29 +118,25 @@ CHECK_AVAILABILITY_SCHEMA: Final[dict[str, Any]] = {
 
 CREATE_BOOKING_SCHEMA: Final[dict[str, Any]] = {
     "name": "create_booking",
-    "description": (
-        "Reserve one of the tables returned by check_availability. "
-        "Only call this after reading the date, time and party size back to the guest "
-        "and hearing them agree."
-    ),
+    "description": _text("tool_create_booking"),
     "parameters": {
         "type": "object",
         "properties": {
             "slot_ref": {
                 "type": "string",
                 "pattern": _SLOT_REF_PATTERN,
-                "description": "A reference from the most recent check_availability result, e.g. 'slot_1'.",
+                "description": _text("tool_create_booking_slot_ref"),
             },
             "guest_name": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 200,
-                "description": "Name to hold the table under, as the guest gave it.",
+                "description": _text("tool_create_booking_guest_name"),
             },
             "party_size": {"type": "integer", "minimum": 1, "maximum": 100},
             "confirmed": {
                 "type": "boolean",
-                "description": "True only when the guest has explicitly agreed to this exact booking.",
+                "description": _text("tool_create_booking_confirmed"),
             },
         },
         "required": ["slot_ref", "guest_name", "party_size", "confirmed"],
@@ -142,11 +146,7 @@ CREATE_BOOKING_SCHEMA: Final[dict[str, Any]] = {
 
 FIND_BOOKING_SCHEMA: Final[dict[str, Any]] = {
     "name": "find_booking",
-    "description": (
-        "Find an existing reservation made on an earlier call. "
-        "Needs both the name it was made under and the date. "
-        "Not needed for a booking made during this call — use its reference directly."
-    ),
+    "description": _text("tool_find_booking"),
     "parameters": {
         "type": "object",
         "properties": {
@@ -160,21 +160,18 @@ FIND_BOOKING_SCHEMA: Final[dict[str, Any]] = {
 
 CANCEL_BOOKING_SCHEMA: Final[dict[str, Any]] = {
     "name": "cancel_booking",
-    "description": (
-        "Cancel a reservation and free the table. "
-        "Only call this after reading the booking back to the guest and hearing them agree."
-    ),
+    "description": _text("tool_cancel_booking"),
     "parameters": {
         "type": "object",
         "properties": {
             "booking_ref": {
                 "type": "string",
                 "pattern": _BOOKING_REF_PATTERN,
-                "description": "A reference from create_booking or find_booking, e.g. 'booking_1'.",
+                "description": _text("tool_cancel_booking_booking_ref"),
             },
             "confirmed": {
                 "type": "boolean",
-                "description": "True only when the guest has explicitly agreed to cancel this booking.",
+                "description": _text("tool_cancel_booking_confirmed"),
             },
         },
         "required": ["booking_ref", "confirmed"],

@@ -63,9 +63,18 @@ def test_the_persona_states_the_language(language: str, expected: str) -> None:
     assert expected in _flow(language).persona()
 
 
-def test_the_greeting_follows_the_configured_language() -> None:
-    assert "Поздоровайся" in _flow("ru").greeting()
-    assert "Greet the guest" in _flow("en").greeting()
+@pytest.mark.parametrize(("language", "expected"), [("ru", "Russian"), ("en", "English")])
+def test_the_greeting_names_the_reply_language_rather_than_being_translated(language: str, expected: str) -> None:
+    """One English instruction with a placeholder, not one file per language.
+
+    The greeting used to branch into a Russian string, which made it the only
+    translated prompt in the service — two texts to keep in step for an
+    instruction the guest never hears.
+    """
+    greeting = _flow(language).greeting()
+
+    assert greeting.startswith("Greet the guest")
+    assert expected in greeting
 
 
 def test_the_venue_and_name_come_from_settings() -> None:
