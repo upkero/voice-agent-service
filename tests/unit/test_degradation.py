@@ -13,9 +13,10 @@ from uuid import uuid4
 from livekit.agents import AgentSession, ErrorEvent, stt, tts
 
 from src.app.contracts.booking import BookingDTO, BookingStatus
+from src.app.messages import degradation_message
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.voice.confirmation import ConfirmationTracker
-from src.app.voice.degradation import CHAT_TOPIC, DegradationNotice, announce, degradation_message
+from src.app.voice.degradation import CHAT_TOPIC, DegradationNotice, announce
 from src.app.voice.session import register_degradation_notices
 from tests.fakes import FakeRoom
 
@@ -57,7 +58,7 @@ async def test_different_problems_are_announced_separately() -> None:
 
 
 def test_every_degradation_message_exists_in_both_languages() -> None:
-    from src.app.voice.degradation import DEGRADATION_MESSAGES
+    from src.app.messages import DEGRADATION_MESSAGES
 
     assert set(DEGRADATION_MESSAGES["ru"]) == set(DEGRADATION_MESSAGES["en"])
     for kind in DEGRADATION_MESSAGES["en"]:

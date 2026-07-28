@@ -29,9 +29,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from src.app.contracts.booking import BookingSummary, SlotOffer
 from src.app.core.settings.agent import AgentSettings
 from src.app.exceptions.booking import BookingError
+from src.app.messages import phrase
 from src.app.prompts import get_prompt
 from src.app.services.booking.reservation_service import ReservationService
-from src.app.services.dialog.phrases import phrase
 from src.app.services.dialog.session_state import DialogSessionState
 
 logger = getLogger(__name__)

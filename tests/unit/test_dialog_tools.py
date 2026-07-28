@@ -11,9 +11,9 @@ from typing import Any
 import pytest
 
 from src.app.core.settings.agent import AgentSettings
+from src.app.messages import phrase
 from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
-from src.app.services.dialog.phrases import phrase
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import TOOL_SCHEMAS, BookingTools
 from tests.fakes import TOMORROW, FakeBookingGateway, UnavailableBookingGateway
@@ -170,7 +170,7 @@ async def test_every_schema_is_closed_and_fully_required() -> None:
 
 async def test_every_failure_reason_has_a_phrase_in_both_languages() -> None:
     """A missing phrase is a mute agent, so it is a test failure instead."""
-    from src.app.services.dialog.phrases import ERROR_PHRASES
+    from src.app.messages import ERROR_PHRASES
 
     assert set(ERROR_PHRASES["ru"]) == set(ERROR_PHRASES["en"])
     assert all(text.strip() for table in ERROR_PHRASES.values() for text in table.values())

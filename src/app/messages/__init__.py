@@ -1,18 +1,32 @@
-"""What Мила says when something goes wrong, per language.
+"""What the guest hears verbatim, one entry per supported language.
+
+The deliberate counterpart to `prompts/`, not an overflow of it. A prompt is an
+instruction *to the model*: it lives in `prompts/`, in English, in exactly one
+copy, and the reply language is a placeholder inside it. These lines are the
+opposite — nobody paraphrases them, the guest receives them word for word — so
+they exist once per language. Keeping them out of `prompts/` is what stops the
+"prompts are English" rule breaking on its first day.
+
+They are also what the agent says when the model is not usable at all: a failed
+tool call and a dead audio leg both have to produce words without asking a
+provider for them.
 
 Data, not subclasses. The dialogue *skeleton* is a Template Method because its
 steps genuinely differ between flows; the wording differs only by language, and
 a class per locale would be ceremony around a dictionary.
-
-Every entry is a sentence a person would say. "Error 503" is not one, and
-neither is silence — a guest on a phone call cannot see a spinner, so a failure
-that produces no words is indistinguishable from the agent having hung up.
 """
 
 from typing import Final
 
+_FALLBACK_LANGUAGE = "en"
+
 # Keyed by our own error_code values, so a new failure mode without a phrase is
 # a visible KeyError in tests rather than a mute agent in production.
+#
+# Every entry is a sentence a person would say. "Error 503" is not one, and
+# neither is silence — a guest on a phone call cannot see a spinner, so a
+# failure that produces no words is indistinguishable from the agent having
+# hung up.
 ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
     "ru": {
         "core_unavailable": (
@@ -52,8 +66,30 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
     },
 }
 
+# What goes out over the data channel when an audio leg is gone. Same rule as
+# above: heard or read by the guest verbatim, so one copy per language.
+DEGRADATION_MESSAGES: Final[dict[str, dict[str, str]]] = {
+    "ru": {
+        "tts": "Голос сейчас недоступен — отвечаю текстом в этом чате.",
+        "stt": "Я вас не слышу — микрофон или распознавание недоступны. Напишите, пожалуйста, сообщением.",
+        # No promise of a text conversation here: if the session itself failed to
+        # start, there is nothing left to answer on and the room is closing.
+        "startup": "Не могу принять звонок — техническая неполадка. Перезвоните, пожалуйста.",
+    },
+    "en": {
+        "tts": "My voice is unavailable right now — I'll answer here in the chat.",
+        "stt": "I can't hear you — speech recognition is unavailable. Please type instead.",
+        "startup": "I can't take the call — something has gone wrong on our side. Please call back.",
+    },
+}
+
 
 def phrase(language: str, code: str) -> str:
     """Look up a sentence, falling back to English rather than to nothing."""
-    table = ERROR_PHRASES.get(language) or ERROR_PHRASES["en"]
-    return table.get(code) or ERROR_PHRASES["en"].get(code, ERROR_PHRASES["en"]["booking_error"])
+    table = ERROR_PHRASES.get(language) or ERROR_PHRASES[_FALLBACK_LANGUAGE]
+    return table.get(code) or ERROR_PHRASES[_FALLBACK_LANGUAGE].get(code, ERROR_PHRASES["en"]["booking_error"])
+
+
+def degradation_message(language: str, kind: str) -> str:
+    table = DEGRADATION_MESSAGES.get(language) or DEGRADATION_MESSAGES[_FALLBACK_LANGUAGE]
+    return table.get(kind) or DEGRADATION_MESSAGES[_FALLBACK_LANGUAGE][kind]

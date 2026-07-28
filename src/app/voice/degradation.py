@@ -71,24 +71,3 @@ class DegradationNotice:
         self._announced.add(kind)
         logger.warning("Degraded: %s", kind, extra={"room": self._room.name, "degradation": kind})
         await announce(self._room, text)
-
-
-DEGRADATION_MESSAGES: dict[str, dict[str, str]] = {
-    "ru": {
-        "tts": "Голос сейчас недоступен — отвечаю текстом в этом чате.",
-        "stt": "Я вас не слышу — микрофон или распознавание недоступны. Напишите, пожалуйста, сообщением.",
-        # No promise of a text conversation here: if the session itself failed to
-        # start, there is nothing left to answer on and the room is closing.
-        "startup": "Не могу принять звонок — техническая неполадка. Перезвоните, пожалуйста.",
-    },
-    "en": {
-        "tts": "My voice is unavailable right now — I'll answer here in the chat.",
-        "stt": "I can't hear you — speech recognition is unavailable. Please type instead.",
-        "startup": "I can't take the call — something has gone wrong on our side. Please call back.",
-    },
-}
-
-
-def degradation_message(language: str, kind: str) -> str:
-    table = DEGRADATION_MESSAGES.get(language) or DEGRADATION_MESSAGES["en"]
-    return table.get(kind) or DEGRADATION_MESSAGES["en"][kind]

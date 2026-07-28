@@ -22,10 +22,11 @@ from src.app.core.settings.tts import get_tts_settings
 from src.app.llm.factory import create_llm
 from src.app.llm.stt_factory import create_stt
 from src.app.llm.tts_factory import create_tts
+from src.app.messages import degradation_message
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import BookingTools
 from src.app.voice.agent import BookingAgent
-from src.app.voice.degradation import DegradationNotice, degradation_message
+from src.app.voice.degradation import DegradationNotice
 
 logger = getLogger(__name__)
 
