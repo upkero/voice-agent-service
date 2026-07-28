@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from logging import getLogger
 from typing import Any
 
@@ -15,31 +16,37 @@ def _error_response(
     status: int,
     detail: Any,
     error_code: str,
-    headers: dict[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     return JSONResponse(
         status_code=status,
         content={"detail": detail, "error_code": error_code},
-        headers=headers,
+        headers=dict(headers) if headers else None,
     )
 
 
 def error_response_from_exception(
     exc: BaseAppException,
-    headers: dict[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     """Render an app exception into the uniform error envelope.
 
     Public because middleware cannot rely on the registered exception handlers:
     those live in Starlette's ExceptionMiddleware, which sits *inside* the HTTP
     middleware stack, so an exception raised in a middleware propagates past it
-    and surfaces as a 500. Middleware therefore builds its response here instead,
-    keeping a single place that knows the envelope format.
+    and surfaces as a raw 500. Middleware returns this instead of raising, which
+    keeps one place that knows the envelope format.
+
+    A service whose rate limiter is a dependency rather than middleware never
+    calls this: dependencies run inside the handler scope, so raising there is
+    already caught below.
     """
     return _error_response(exc.status_code, exc.detail, exc.error_code, headers=headers)
 
 
 async def handle_app_exception(request: Request, exc: BaseAppException) -> JSONResponse:
+    # 5xx are our fault and get a stacktrace; 4xx are the caller's and stay quiet.
+    # Either way the caller receives the same typed envelope, never a traceback.
     if exc.status_code >= 500:
         logger.error(
             "Application error on %s %s: %s",
@@ -47,24 +54,26 @@ async def handle_app_exception(request: Request, exc: BaseAppException) -> JSONR
             request.url.path,
             exc.detail,
             exc_info=exc,
+            extra=exc.extra,
         )
-    # `exc.headers` is what carries Retry-After out of a 429: without it the
-    # caller is told to wait and never told how long.
-    return _error_response(exc.status_code, exc.detail, exc.error_code, headers=exc.headers or None)
+    # `or None` rather than the mapping: an empty one would still be handed to
+    # JSONResponse, and only a 429 normally has anything to say (Retry-After).
+    return error_response_from_exception(exc, headers=exc.headers or None)
 
 
 async def handle_request_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
     logger.warning("Request validation error on %s %s", request.method, request.url.path)
     errors = exc.errors()
     for err in errors:
+        # Pydantic sometimes tucks a raw exception into ctx; JSONResponse cannot
+        # serialise it, so stringify before it reaches the encoder.
         if (ctx := err.get("ctx")) and isinstance(ctx.get("error"), Exception):
             ctx["error"] = str(ctx["error"])
     return _error_response(422, errors, "request_validation_error")
 
 
 async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-    headers = dict(exc.headers) if exc.headers else None
-    return _error_response(exc.status_code, exc.detail, "http_error", headers=headers)
+    return _error_response(exc.status_code, exc.detail, "http_error", headers=exc.headers)
 
 
 async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
@@ -73,6 +82,8 @@ async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONR
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    # Starlette types handlers as taking a bare Exception; ours take the narrower
+    # concrete type they are registered for — a known typing mismatch, not a bug.
     app.add_exception_handler(BaseAppException, handle_app_exception)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, handle_request_validation_error)  # type: ignore[arg-type]
     app.add_exception_handler(StarletteHTTPException, handle_http_exception)  # type: ignore[arg-type]
