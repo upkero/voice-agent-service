@@ -28,11 +28,13 @@ class TTSSettings(BaseSettings):
         description="Which TTS implementation to build. cartesia is streaming and low-latency.",
     )
     fallback_provider: TTSProvider | None = Field(
-        default=None,
+        default="piper",
         description=(
-            "Optional second provider, wrapped with the primary in a FallbackAdapter. If the primary "
-            "(e.g. streaming cartesia) fails, the session fails over to this one. Pair a streaming "
-            "primary with a local piper fallback so a provider outage degrades to an offline voice."
+            "Second provider, wrapped with the primary in a FallbackAdapter. If the primary (e.g. "
+            "streaming cartesia) fails, the session fails over to this one. Defaults to piper — the "
+            "binary and both voices are baked into the agent image, so a cloud outage degrades to an "
+            "offline voice instead of to silence. Ignored when it equals the primary; set to an empty "
+            "value to run with no fallback at all."
         ),
     )
     voice: str | None = Field(
@@ -72,13 +74,16 @@ class TTSSettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_provider_requirements(self) -> "TTSSettings":
+        if self.fallback_provider == self.provider:
+            # The default fallback is piper, which is also the default primary,
+            # so this is the ordinary case rather than a mistake.
+            self.fallback_provider = None
+
         providers = {self.provider, self.fallback_provider}
         if "openai_compatible" in providers and not self.base_url:
             raise ValueError("TTS_BASE_URL is required when TTS uses the openai_compatible provider.")
         if "cartesia" in providers and not self.api_key:
             raise ValueError("TTS_API_KEY (a Cartesia key) is required when TTS uses the cartesia provider.")
-        if self.fallback_provider is not None and self.fallback_provider == self.provider:
-            raise ValueError("TTS_FALLBACK_PROVIDER must differ from TTS_PROVIDER.")
         return self
 
     def resolve_voice(self, language: str) -> str:

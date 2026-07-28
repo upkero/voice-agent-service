@@ -27,11 +27,13 @@ class STTSettings(BaseSettings):
         description="Which STT implementation to build. deepgram and whisper_stream are true streaming.",
     )
     fallback_provider: STTProvider | None = Field(
-        default=None,
+        default="faster_whisper",
         description=(
-            "Optional second provider. When set, the two are wrapped in a FallbackAdapter: if the "
-            "primary (e.g. streaming deepgram) fails at connect time, the session fails over to this "
-            "one per request. A natural pairing is a streaming primary with a batch fallback."
+            "Second provider, wrapped with the primary in a FallbackAdapter: if the primary (e.g. "
+            "streaming deepgram) fails, the session fails over to this one per request. Defaults to "
+            "faster_whisper — it is baked into the agent image, runs offline and costs nothing, so a "
+            "cloud outage becomes something the guest never notices. Ignored when it equals the "
+            "primary; set to an empty value to run with no fallback at all."
         ),
     )
     model: str = Field(
@@ -80,6 +82,12 @@ class STTSettings(BaseSettings):
         # base URL is a config mistake, and discovering it mid-call means a
         # guest hears silence while the logs explain why. Both the primary and
         # the fallback have to be usable, or the fallback is a false comfort.
+        if self.fallback_provider == self.provider:
+            # The default fallback is faster_whisper, which is also the default
+            # primary, so this is the ordinary case rather than a mistake. A
+            # FallbackAdapter over one provider twice would only retry itself.
+            self.fallback_provider = None
+
         providers = {self.provider, self.fallback_provider}
         if "openai_compatible" in providers and not self.base_url:
             raise ValueError("STT_BASE_URL is required when STT uses the openai_compatible provider.")
@@ -87,8 +95,6 @@ class STTSettings(BaseSettings):
             raise ValueError("STT_API_KEY (a Deepgram key) is required when STT uses the deepgram provider.")
         if "whisper_stream" in providers and not self.whisper_stream_url:
             raise ValueError("STT_WHISPER_STREAM_URL is required when STT uses the whisper_stream provider.")
-        if self.fallback_provider is not None and self.fallback_provider == self.provider:
-            raise ValueError("STT_FALLBACK_PROVIDER must differ from STT_PROVIDER.")
         return self
 
 

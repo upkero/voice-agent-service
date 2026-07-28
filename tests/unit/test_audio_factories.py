@@ -5,8 +5,11 @@ it needs a key. So the factory's job (pick the right implementation, declare the
 right streaming capability, wrap a fallback) is fully testable here.
 """
 
+from unittest.mock import Mock
+
 import pytest
 from livekit.agents import stt, tts
+from livekit.agents import vad as vad_module
 
 from src.app.core.settings.stt import STTSettings
 from src.app.core.settings.tts import TTSSettings
@@ -26,17 +29,21 @@ def _tts(**kw: object) -> TTSSettings:
 
 # --- STT provider selection ---------------------------------------------------
 def test_openai_compatible_is_batch() -> None:
-    client = create_stt(_stt(provider="openai_compatible", base_url="https://x/api/v1", api_key="k"), "ru")
+    client = create_stt(
+        _stt(provider="openai_compatible", base_url="https://x/api/v1", api_key="k", fallback_provider=None), "ru"
+    )
     assert client.capabilities.streaming is False
 
 
 def test_deepgram_is_streaming() -> None:
-    client = create_stt(_stt(provider="deepgram", api_key="dg", model="nova-3"), "ru")
+    client = create_stt(_stt(provider="deepgram", api_key="dg", model="nova-3", fallback_provider=None), "ru")
     assert client.capabilities.streaming is True
 
 
 def test_whisper_stream_is_streaming() -> None:
-    client = create_stt(_stt(provider="whisper_stream", whisper_stream_url="ws://whisper:9090"), "ru")
+    client = create_stt(
+        _stt(provider="whisper_stream", whisper_stream_url="ws://whisper:9090", fallback_provider=None), "ru"
+    )
     assert client.capabilities.streaming is True
 
 
@@ -59,15 +66,32 @@ def test_streaming_providers_demand_their_config(kwargs: dict[str, str], missing
         _stt(**kwargs)
 
 
-def test_a_fallback_equal_to_the_primary_is_rejected() -> None:
-    with pytest.raises(ValueError, match="differ"):
-        _stt(provider="faster_whisper", fallback_provider="faster_whisper")
+def test_a_fallback_equal_to_the_primary_is_dropped() -> None:
+    """faster_whisper is both the default primary and the default fallback, so
+    this is the out-of-the-box case rather than a mistake to reject."""
+    assert _stt(provider="faster_whisper", fallback_provider="faster_whisper").fallback_provider is None
 
 
 # --- Fallback wiring ----------------------------------------------------------
 def test_no_fallback_returns_a_single_client() -> None:
-    client = create_stt(_stt(provider="deepgram", api_key="dg", model="nova-3"), "ru")
+    client = create_stt(_stt(provider="deepgram", api_key="dg", model="nova-3", fallback_provider=None), "ru")
     assert not isinstance(client, stt.FallbackAdapter)
+
+
+def test_a_cloud_primary_gets_the_offline_fallback_without_being_asked() -> None:
+    """The point of the default: nobody has to know the setting exists for a
+    Deepgram outage to stop being the guest's problem."""
+    client = create_stt(
+        _stt(provider="deepgram", api_key="dg", model="nova-3"),
+        "ru",
+        vad=Mock(spec=vad_module.VAD),
+    )
+    assert isinstance(client, stt.FallbackAdapter)
+
+
+def test_the_default_tts_fallback_is_the_offline_voice() -> None:
+    client = create_tts(_tts(provider="cartesia", api_key="ct", voice="v"), "ru")
+    assert isinstance(client, tts.FallbackAdapter)
 
 
 def test_two_streaming_providers_wrap_in_a_fallback_adapter() -> None:
@@ -103,7 +127,7 @@ def test_a_batch_fallback_without_a_vad_fails_loudly() -> None:
 
 # --- TTS ----------------------------------------------------------------------
 def test_cartesia_builds() -> None:
-    client = create_tts(_tts(provider="cartesia", api_key="ct", voice="v"), "ru")
+    client = create_tts(_tts(provider="cartesia", api_key="ct", voice="v", fallback_provider=None), "ru")
     assert isinstance(client, tts.TTS)
 
 
@@ -118,5 +142,5 @@ def test_tts_fallback_wraps() -> None:
 
 
 def test_piper_needs_no_key() -> None:
-    client = create_tts(_tts(provider="piper"), "ru")
+    client = create_tts(_tts(provider="piper"), "ru")  # its own fallback is dropped
     assert isinstance(client, tts.TTS)
