@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, Response
 from src.app.core.request_id import generate_request_id, set_request_id
 
 _HEADER = "X-Request-ID"
-_SKIP_PATHS = frozenset({"/metrics", "/health"})
+_SKIP_PATHS = frozenset({"/metrics", "/health/live", "/health/ready"})
 
 
 def register_request_id_middleware(app: FastAPI) -> None:
