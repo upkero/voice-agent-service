@@ -6,7 +6,7 @@
 
 A real LiveKit voice agent that books restaurant tables by phone. Persona: **Мила**, a
 receptionist for a fictional restaurant. She listens, speaks, and calls typed tools to check
-availability and take a booking against [`ops-core-api`](../ops-core-api) — a genuine WebRTC
+availability and take a booking against [`ops-core-api`](https://github.com/upkero/ops-core-api) — a genuine WebRTC
 voice pipeline (LiveKit transport, streaming STT → LLM → TTS, deterministic tool-calling), not a
 browser Web-Speech imitation.
 
@@ -26,7 +26,7 @@ for speech** — only the key of the ops-core-api instance holding the booking d
 | Deterministic tools | Four function tools with explicit JSON Schema + Pydantic validation before dispatch, so a mishearing cannot take a table. |
 | Booking | Checks availability, offers the nearest real slots, books, finds and cancels — all against ops-core-api over HTTP. |
 | Bilingual | `AGENT_LANGUAGE=ru\|en` switches the Whisper hint, the piper voice and the persona in one setting. |
-| Graceful degradation | ops-core-api down, or STT/TTS unavailable, produces a spoken or data-channel explanation — never silence or a crash. |
+| Graceful degradation | ops-core-api down, or an exhausted STT/TTS fallback chain, produces a spoken or data-channel explanation — never silence. |
 
 Two processes live in this repo:
 
@@ -45,7 +45,7 @@ ops-core-api. Full description and the patterns table in [`docs/architecture.md`
 ```
         api/v1  (HTTP)   │   voice  (LiveKit worker)      ← delivery
                     services  (business logic)
-        repositories     │   llm  (stt / tts / dialogue)
+          gateways       │   llm  (stt / tts / dialogue)
                     interfaces  (ABC ports)
                     contracts  (frozen dataclasses)
               core / exceptions / bootstrap
@@ -53,7 +53,7 @@ ops-core-api. Full description and the patterns table in [`docs/architecture.md`
 
 | Pattern | Where |
 |---|---|
-| **Adapter** | HTTP client to ops-core-api behind the `BookingRepository` port; local model/binary behind livekit's STT/TTS. |
+| **Adapter** | HTTP client to ops-core-api behind the `BookingGateway` port; local model/binary behind livekit's STT/TTS. |
 | **Factory** | One constructor each for the dialogue LLM, the STT client and the TTS client — provider chosen by settings. |
 | **Strategy** | Slot ranking (nearest-time vs earliest-first), injected into `ReservationService`. |
 | **Template Method** | The dialogue system prompt: fixed section order, overridable steps. |
@@ -83,7 +83,7 @@ cold start pulls nothing.
 
 **You still need a dialogue LLM and the booking backend running:**
 
-- **ops-core-api** — start it from its own folder (`cd ../ops-core-api && docker compose up -d`).
+- **ops-core-api** — start it from its own folder (`git clone https://github.com/upkero/ops-core-api && cd ops-core-api && docker compose up -d`).
   If it is down, the demo still connects and Мила explains the outage out loud — that is the
   degradation path, live.
 - **An LLM with tool-calling** — the default `.env` points at a local Ollama
@@ -107,6 +107,10 @@ curl -X POST http://localhost:8080/api/v1/token \
 # {"token":"eyJ…","room_name":"table-demo","participant_name":"demo-x1y2z3",
 #  "livekit_url":"ws://localhost:7880","expires_at":"…"}
 ```
+
+`POST /api/v1/token` is the one endpoint a browser calls, and `CORS_ALLOWED_ORIGINS` defaults to
+empty — no origin is allowed until you name one. Set it (CSV, e.g.
+`CORS_ALLOWED_ORIGINS=http://localhost:5173`) before pointing a web client at this service.
 
 ## Talking to Мила
 
@@ -154,14 +158,18 @@ implementing `/audio/transcriptions` and `/audio/speech`. OpenRouter is batch RE
 streaming (near-zero STT latency, ~90ms TTS) use `deepgram` / `cartesia`, whose LiveKit plugins hit
 the providers' native WebSockets.
 
-### Fallback: prefer streaming, degrade gracefully
+### Fallback: on by default, not an option to discover
 
-Set `STT_FALLBACK_PROVIDER` / `TTS_FALLBACK_PROVIDER` and the two providers are wrapped in a
-`FallbackAdapter`: if the streaming primary fails at connect time, the session fails over to the
-secondary per request. A production pairing is a streaming primary with a resilient fallback —
-`STT_PROVIDER=deepgram` + `STT_FALLBACK_PROVIDER=openai_compatible`, or
-`TTS_PROVIDER=cartesia` + `TTS_FALLBACK_PROVIDER=piper` so a provider outage drops to the offline
-voice instead of to silence.
+`STT_FALLBACK_PROVIDER` defaults to `faster_whisper` and `TTS_FALLBACK_PROVIDER` to `piper`. Both
+are baked into the agent image, run offline and cost nothing, so putting a cloud provider in
+`STT_PROVIDER` / `TTS_PROVIDER` gets you a `FallbackAdapter` over the two without configuring
+anything: a Deepgram or Cartesia outage becomes a slower answer rather than the guest's problem.
+A fallback equal to the primary is ignored, so the all-local default stays a single client; set
+the variable empty to run with no fallback at all.
+
+The offline fallback is a batch provider, and the `FallbackAdapter` needs a VAD to segment one —
+`build_session` supplies Silero from the worker's prewarm. A missing VAD is a startup error rather
+than a surprise mid-call.
 
 ### Self-hosted streaming STT
 
@@ -210,6 +218,13 @@ real IDs. A reference the session never issued cannot resolve, so a hallucinated
 locally instead of reaching ops-core-api. A booking made during the call is cancellable by its
 reference with no second lookup.
 
+**All model-facing text lives in `prompts/`.** The system prompt's five sections and every tool
+`description` are Markdown files loaded at import, in English, with the reply language as a
+`{reply_language}` placeholder rather than a translated copy — a translated prompt forks on the
+next edit, and Cyrillic costs two to three times the tokens on every call. What the guest hears
+*verbatim* is the opposite case and lives in `messages/`, one entry per language: error phrases
+and degradation notices are received word for word, so they cannot be English-only.
+
 **Duplicate and orphaned bookings.** Booking is idempotent: the key is derived from the intent
 (`sha256(room:intent_seq:slot:name:party)`), so a network retry or a repeated tool call replays
 the one booking instead of taking a second table. Cancelling bumps `intent_seq`, so a guest can
@@ -227,7 +242,7 @@ uv run mypy src
 uv run pytest --cov=src/app/services --cov-report=term-missing
 ```
 
-104 tests, ~94% coverage on the service layer. No database and no network: the `BookingRepository`
+140 tests, ~97% coverage on the service layer. No database and no network: the `BookingGateway`
 port is replaced with an in-memory fake (its second implementation), so the whole suite runs
 offline. CI runs the same four commands on every push.
 
@@ -280,7 +295,7 @@ uv run python -m src.entrypoint dev   # reads .env; set LIVEKIT_URL=ws://localho
 Настоящий голосовой агент на **LiveKit**, который бронирует столики в ресторане по телефону.
 Персона — **Мила**, администратор вымышленного ресторана: слышит, говорит и вызывает строго
 типизированные инструменты, чтобы проверить наличие мест и оформить бронь в
-[`ops-core-api`](../ops-core-api). Это полноценный WebRTC-пайплайн (LiveKit-транспорт,
+[`ops-core-api`](https://github.com/upkero/ops-core-api). Это полноценный WebRTC-пайплайн (LiveKit-транспорт,
 потоковый STT → LLM → TTS, детерминированный tool-calling), а не имитация через браузерный
 Web Speech API.
 
@@ -296,7 +311,7 @@ Web Speech API.
 | Детерминированные инструменты | Четыре function-tool со строгой JSON Schema и валидацией Pydantic до вызова — ослышка не приводит к брони. |
 | Бронирование | Проверка наличия, ближайшие реальные слоты, бронь, поиск и отмена — всё через HTTP к ops-core-api. |
 | Двуязычность | `AGENT_LANGUAGE=ru\|en` переключает подсказку Whisper, голос piper и персону одной настройкой. |
-| Грациозная деградация | Недоступность ops-core-api или STT/TTS даёт голосовое или текстовое объяснение — не тишину и не падение. |
+| Грациозная деградация | Недоступность ops-core-api или исчерпанная цепочка fallback'ов STT/TTS даёт голосовое или текстовое объяснение — не тишину. |
 
 Два процесса в одном репозитории:
 
@@ -314,7 +329,7 @@ ops-core-api. Подробно и таблица паттернов — в [`doc
 
 | Паттерн | Где |
 |---|---|
-| **Adapter** | HTTP-клиент к ops-core-api за портом `BookingRepository`; локальная модель/бинарь за STT/TTS livekit. |
+| **Adapter** | HTTP-клиент к ops-core-api за портом `BookingGateway`; локальная модель/бинарь за STT/TTS livekit. |
 | **Factory** | По одному конструктору на диалоговый LLM, STT- и TTS-клиент — провайдер выбирается настройками. |
 | **Strategy** | Ранжирование слотов (ближайшее время / раньше всех), внедряется в `ReservationService`. |
 | **Template Method** | Системный промпт диалога: фиксированный порядок секций, переопределяемые шаги. |
@@ -338,7 +353,7 @@ docker compose up --build
 
 **Дополнительно нужны LLM и бэкенд бронирований:**
 
-- **ops-core-api** — запустите из его папки (`cd ../ops-core-api && docker compose up -d`). Если он
+- **ops-core-api** — запустите из его папки (`git clone https://github.com/upkero/ops-core-api && cd ops-core-api && docker compose up -d`). Если он
   недоступен, демо всё равно подключается, и Мила объясняет проблему голосом — это и есть проверка
   деградации вживую.
 - **LLM с tool-calling** — по умолчанию `.env` смотрит на локальный Ollama (`qwen2.5:7b`). Можно
@@ -356,17 +371,61 @@ docker compose up --build
 ## Настройка речи (STT и TTS независимы)
 
 Распознавание и синтез — два раздельных порта с раздельными блоками настроек. Поддерживается любая
-комбинация: локальное распознавание с облачным голосом или наоборот.
+комбинация: локальное распознавание с облачным голосом или наоборот. **Стриминговый провайдер или
+батчевый — в коде приложения нигде не ветвление:** каждый клиент объявляет свою capability, а
+`AgentSession` сама оборачивает батчевый в свой VAD-сегментатор.
 
-- **STT:** `faster_whisper` (локально, по умолчанию) или `openai_compatible` (`STT_BASE_URL` /
-  `STT_API_KEY` / `STT_MODEL`).
-- **TTS:** `piper` (локально, по умолчанию) или `openai_compatible` (`TTS_BASE_URL` / `TTS_API_KEY`
-  / `TTS_MODEL`).
+| `STT_PROVIDER` | Режим | Задержка после реплики | Что нужно |
+|---|---|---|---|
+| `faster_whisper` | батч, локально | ~1-2с (CPU) | ничего — офлайн-умолчание |
+| `openai_compatible` | батч REST | ~2с на фрагмент | `STT_BASE_URL` / `STT_API_KEY` / `STT_MODEL` |
+| `deepgram` | **стриминг** | ~150-300мс | ключ Deepgram в `STT_API_KEY`, `STT_MODEL=nova-3` |
+| `whisper_stream` | **стриминг** | ~1с на GPU | `STT_WHISPER_STREAM_URL` → свой WhisperLive |
+
+| `TTS_PROVIDER` | Режим | Первый байт | Что нужно |
+|---|---|---|---|
+| `piper` | локально | ~150мс | ничего — офлайн-умолчание |
+| `openai_compatible` | батч REST | ~2-3с | `TTS_BASE_URL` / `TTS_API_KEY` / `TTS_MODEL` / `TTS_VOICE` |
+| `cartesia` | **стриминг** | ~90мс | ключ Cartesia в `TTS_API_KEY`, `TTS_MODEL=sonic-2`, свой `TTS_VOICE` |
 
 Облачные клиенты не привязаны к провайдеру: конкретный сервис выбирает `*_BASE_URL` (OpenRouter,
 OpenAI, свой сервер с OpenAI-совместимым audio-API), а не код. Провайдер **без** OpenAI-совместимого
 контракта (например Cartesia) — это отдельная реализация того же порта `TTSClient` плюс одна ветка в
-`llm/tts_factory.py`, по Open/Closed; в остальном коде не меняется ничего (см. английскую часть).
+`llm/tts_factory.py`, по Open/Closed; в остальном коде не меняется ничего.
+
+### Fallback включён по умолчанию
+
+`STT_FALLBACK_PROVIDER` по умолчанию `faster_whisper`, `TTS_FALLBACK_PROVIDER` — `piper`. Оба вшиты
+в образ агента, работают офлайн и ничего не стоят, поэтому достаточно поставить облачного провайдера
+в `STT_PROVIDER` / `TTS_PROVIDER`: пара автоматически заворачивается в `FallbackAdapter`, и сбой
+Deepgram или Cartesia превращается в более медленный ответ, а не в проблему гостя. Fallback, равный
+основному провайдеру, игнорируется; пустое значение отключает его совсем.
+
+### Свой стриминговый STT
+
+`whisper_stream` работает с сервером [WhisperLive](https://github.com/collabora/WhisperLive): это
+настоящий стриминг (скользящий буфер + LocalAgreement, контекст переживает границы фрагментов).
+Сервер — **сервис-сосед, доступный по URL**, той же формы, что и ops-core-api:
+
+```bash
+docker compose --profile selfhost-stt up   # WhisperLive на ws://whisper:9090
+# затем: STT_PROVIDER=whisper_stream, STT_WHISPER_STREAM_URL=ws://whisper:9090
+```
+
+В продакшене он переезжает на свою GPU-машину без изменений в коде — меняется только URL.
+
+## Как ведёт себя деградация
+
+| Отказ | Что получает гость |
+|---|---|
+| ops-core-api недоступен / 5xx | Произнесённая фраза («не могу заглянуть в журнал — записать ваш номер?»). В пайплайн исключение не уходит. |
+| Отказал TTS | Текст ответа уходит в data-канал комнаты, о проблеме сообщается один раз. Сессия жива. |
+| Отказал STT | Мила говорит, что не слышит (TTS ещё работает); текстовый ввод включён, так что тот же цикл LLM + инструментов работает набором с клавиатуры. |
+| Не поднялась сама сессия | Джоб падает, комната закрывается. Последняя фраза успевает уйти в data-канал, но текстового запасного пути здесь нет: `text_enabled` — параметр *сессии*, и сессия, которая не стартовала, не примет и текст. |
+
+Про STT и TTS сказано «отказал» в точном смысле: сообщение уходит, только когда `FallbackAdapter`
+перебрал всех настроенных провайдеров и livekit пометил ошибку как невосстановимую. На первом
+транзиентном сбое Мила молчит и продолжает работать.
 
 ## Тесты
 
@@ -375,6 +434,6 @@ uv sync && uv run ruff check . && uv run mypy src
 uv run pytest --cov=src/app/services --cov-report=term-missing
 ```
 
-104 теста, ~94% покрытия слоя services. Ни базы, ни сети: порт `BookingRepository` заменяется
+140 тестов, ~97% покрытия слоя services. Ни базы, ни сети: порт `BookingGateway` заменяется
 in-memory фейком (его вторая реализация), так что весь набор идёт офлайн. CI гоняет те же команды на
 каждый push.
