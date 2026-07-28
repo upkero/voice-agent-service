@@ -27,7 +27,7 @@ logger = getLogger(__name__)
 
 _GUARDED_PATH = "/api/v1/token"
 
-# ponytail: in-memory counters, so the window is per process. Correct while the
+# NOTE: in-memory counters, so the window is per process. Correct while the
 # Dockerfile pins uvicorn to one worker; swap MemoryStorage for Redis storage if
 # this is ever scaled out.
 _storage = MemoryStorage()
