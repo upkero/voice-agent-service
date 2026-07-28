@@ -62,17 +62,21 @@ ops-core-api. Full description and the patterns table in [`docs/architecture.md`
 
 ```bash
 cp .env.example .env
-# set OPS_CORE_API_KEY to your ops-core-api key (the .env.example ships a dev one)
+# set OPS_CORE_API_KEY to your ops-core-api key
 docker compose up --build
 ```
+
+The placeholder `OPS_CORE_API_KEY=change-me-min-16-chars` is the same value in all five
+services of the portfolio, so a fresh `cp .env.example .env` gives a working demo. Rotate it
+in all five at once — one service left behind answers every call with a 401.
 
 That brings up three containers:
 
 | Service | Port | Role |
 |---|---|---|
 | `livekit` | 7880 / 7881 / 7882 | LiveKit server in `--dev` mode (issues the `devkey`/`secret` pair) |
-| `api` | 8080 | Token + health HTTP server |
-| `agent` | — | The voice worker; registers with LiveKit and waits for a call |
+| `voice-api` | 8080 | Token + health HTTP server |
+| `voice-agent` | — | The voice worker; registers with LiveKit and waits for a call |
 
 The agent image bakes in the piper binary, both voices and the Whisper model at build time, so a
 cold start pulls nothing.
@@ -319,12 +323,16 @@ ops-core-api. Подробно и таблица паттернов — в [`doc
 
 ```bash
 cp .env.example .env
-# укажите OPS_CORE_API_KEY — ключ вашего ops-core-api (в .env.example лежит dev-значение)
+# укажите OPS_CORE_API_KEY — ключ вашего ops-core-api
 docker compose up --build
 ```
 
-Поднимаются три контейнера: `livekit` (dev-режим, пара `devkey`/`secret`), `api` (порт 8080,
-токены и health) и `agent` (голосовой воркер, регистрируется в LiveKit и ждёт звонка). Образ агента
+Плейсхолдер `OPS_CORE_API_KEY=change-me-min-16-chars` одинаков во всех пяти сервисах портфолио,
+поэтому свежий `cp .env.example .env` даёт рабочее демо. Ротируйте его сразу во всех пяти: один
+отставший сервис отвечает 401 на каждый вызов.
+
+Поднимаются три контейнера: `livekit` (dev-режим, пара `devkey`/`secret`), `voice-api` (порт 8080,
+токены и health) и `voice-agent` (голосовой воркер, регистрируется в LiveKit и ждёт звонка). Образ агента
 на этапе сборки вшивает бинарь piper, оба голоса и модель Whisper, поэтому холодный старт ничего не
 качает.
 
