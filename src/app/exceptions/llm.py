@@ -13,15 +13,3 @@ class LLMConfigurationError(LLMError):
 
     error_code = "llm_configuration_error"
 
-
-class LLMInputError(LLMError, ValueError):
-    """Raised when LLM input payload is invalid."""
-
-    status_code = 422
-    error_code = "llm_input_error"
-
-
-class LLMGenerationError(LLMError):
-    """Raised when provider generation fails."""
-
-    error_code = "llm_generation_error"

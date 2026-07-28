@@ -53,16 +53,6 @@ class LLMSettings(BaseSettings):
         default=None,
         description="Reasoning effort level (o-series / xAI models).",
     )
-    price_prompt_per_1m: float | None = Field(
-        default=None,
-        ge=0,
-        description="USD price per 1M prompt tokens, for usage cost tracking.",
-    )
-    price_completion_per_1m: float | None = Field(
-        default=None,
-        ge=0,
-        description="USD price per 1M completion tokens, for usage cost tracking.",
-    )
 
     model_config = SettingsConfigDict(
         env_prefix="LLM_",
