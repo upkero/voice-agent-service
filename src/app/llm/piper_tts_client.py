@@ -11,6 +11,7 @@ contract has been stable for years.
 import asyncio
 from logging import getLogger
 from pathlib import Path
+from typing import cast
 
 from livekit.agents import APIConnectionError, tts, utils
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
@@ -56,8 +57,12 @@ class PiperTTSClient(TTSClient):
 
 class _PiperStream(tts.ChunkedStream):
     async def _run(self, output_emitter: tts.AudioEmitter) -> None:
-        client = self._tts
-        assert isinstance(client, PiperTTSClient)
+        # livekit types `self._tts` as the base tts.TTS; this stream is only ever
+        # constructed by PiperTTSClient, so the narrowing is a fact about
+        # the framework rather than a check. A raised exception here would be a
+        # branch that cannot run — and if it somehow did, it would be silence in
+        # the middle of a phone call.
+        client = cast(PiperTTSClient, self._tts)
         settings = client.settings
 
         if not client.model_path.exists():

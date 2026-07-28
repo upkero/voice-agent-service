@@ -13,7 +13,7 @@ other line of this service.
 """
 
 from logging import getLogger
-from typing import Literal
+from typing import Literal, cast
 
 from livekit.agents import APIConnectionError, tts, utils
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
@@ -70,8 +70,12 @@ class OpenAICompatibleTTSClient(TTSClient):
 
 class _OpenAICompatibleStream(tts.ChunkedStream):
     async def _run(self, output_emitter: tts.AudioEmitter) -> None:
-        client = self._tts
-        assert isinstance(client, OpenAICompatibleTTSClient)
+        # livekit types `self._tts` as the base tts.TTS; this stream is only ever
+        # constructed by OpenAICompatibleTTSClient, so the narrowing is a fact about
+        # the framework rather than a check. A raised exception here would be a
+        # branch that cannot run — and if it somehow did, it would be silence in
+        # the middle of a phone call.
+        client = cast(OpenAICompatibleTTSClient, self._tts)
 
         output_emitter.initialize(
             request_id=utils.shortuuid(),
