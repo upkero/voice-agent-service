@@ -34,7 +34,7 @@ class CoreApiSettings(BaseSettings):
         description="Total attempts per call, including the first. Bounded: retries cost silence on a live call.",
     )
 
-    model_config = SettingsConfigDict(env_prefix="CORE_API_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="OPS_CORE_", env_file=".env", extra="ignore")
 
 
 @lru_cache(maxsize=1)

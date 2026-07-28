@@ -2,7 +2,7 @@ import os
 
 # Set before importing anything from src: settings are read at import time and
 # then cached, and environment variables take priority over any local .env file.
-os.environ.setdefault("CORE_API_API_KEY", "test-core-api-key-1234567890")
+os.environ.setdefault("OPS_CORE_API_KEY", "test-core-api-key-1234567890")
 os.environ.setdefault("LIVEKIT_API_KEY", "devkey")
 os.environ.setdefault("LIVEKIT_API_SECRET", "test-livekit-secret-value-at-least-32-bytes")
 os.environ.setdefault("LIVEKIT_URL", "ws://livekit-test:7880")

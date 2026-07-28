@@ -15,7 +15,7 @@ jobs:
     env:
       # Settings are read at import time, and a required key with no value would
       # fail collection before any test runs. This is a throwaway CI value.
-      CORE_API_API_KEY: ci-placeholder-key-not-a-secret
+      OPS_CORE_API_KEY: ci-placeholder-key-not-a-secret
       LIVEKIT_API_SECRET: ci-placeholder-secret-at-least-16
 
     steps:

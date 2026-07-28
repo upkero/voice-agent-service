@@ -62,7 +62,7 @@ ops-core-api. Full description and the patterns table in [`docs/architecture.md`
 
 ```bash
 cp .env.example .env
-# set CORE_API_API_KEY to your ops-core-api key (the .env.example ships a dev one)
+# set OPS_CORE_API_KEY to your ops-core-api key (the .env.example ships a dev one)
 docker compose up --build
 ```
 
@@ -319,7 +319,7 @@ ops-core-api. Подробно и таблица паттернов — в [`doc
 
 ```bash
 cp .env.example .env
-# укажите CORE_API_API_KEY — ключ вашего ops-core-api (в .env.example лежит dev-значение)
+# укажите OPS_CORE_API_KEY — ключ вашего ops-core-api (в .env.example лежит dev-значение)
 docker compose up --build
 ```
 
