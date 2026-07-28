@@ -17,7 +17,7 @@ class AppSettings(BaseSettings):
     # "a,b" env value fails at parse time and split_comma_separated never sees it.
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(
         default=[],
-        description="Allowed browser origins, comma-separated in the environment. Empty means no browser may call this.",
+        description="Allowed browser origins, comma-separated. Empty means no browser may call this service.",
     )
     token_rate_limit_per_minute: int = Field(
         default=20,

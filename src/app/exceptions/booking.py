@@ -31,6 +31,19 @@ class CoreUnavailableError(BookingError):
     default_detail = "The booking service is unavailable."
 
 
+class CoreRateLimitedError(BookingError):
+    """ops-core-api is throttling us, and still was after the last attempt.
+
+    Kept apart from CoreUnavailableError on purpose: "wait and try again" is a
+    different fact from "it is broken", and it is the only one that comes with a
+    number attached. The `Retry-After` the upstream sent travels on `headers`.
+    """
+
+    status_code = 429
+    error_code = "core_rate_limited"
+    default_detail = "The booking service is rate limiting us. Please retry shortly."
+
+
 class SlotTakenError(BookingError):
     """Someone else booked the slot between the offer and the confirmation.
 

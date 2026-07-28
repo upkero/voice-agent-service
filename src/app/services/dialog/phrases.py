@@ -19,6 +19,7 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
             "Не могу сейчас заглянуть в журнал бронирований — похоже, система недоступна. "
             "Давайте я запишу ваш номер, и мы перезвоним?"
         ),
+        "core_rate_limited": "Журнал бронирований сейчас перегружен. Секунду, попробую ещё раз.",
         "slot_unavailable": "Извините, этот столик только что заняли. Посмотрю, что есть рядом по времени.",
         "slot_capacity_exceeded": "За этот столик столько гостей не поместится. Подберу побольше.",
         "entity_not_found": "Не нахожу брони на это имя и число. Может быть, она на другой день?",
@@ -36,6 +37,7 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
             "I can't reach the reservations diary right now — the system seems to be down. "
             "Shall I take your number and call you back?"
         ),
+        "core_rate_limited": "The reservations diary is busy at the moment. One second, let me try again.",
         "slot_unavailable": "Sorry, that table has just been taken. Let me see what's free around that time.",
         "slot_capacity_exceeded": "That table won't seat your party. Let me find a bigger one.",
         "entity_not_found": "I can't find a booking under that name for that date. Might it be another day?",

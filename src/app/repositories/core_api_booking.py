@@ -22,6 +22,7 @@ from src.app.core.settings.core_api import CoreApiSettings
 from src.app.exceptions.booking import (
     BookingError,
     BookingNotFoundError,
+    CoreRateLimitedError,
     CoreUnavailableError,
     IdempotencyKeyConsumedError,
     IdempotencyKeyReusedError,
@@ -56,8 +57,17 @@ class _TransientError(Exception):
     """Internal marker for failures worth repeating.
 
     Private to this module: it exists only to tell the retry decorator what to
-    retry, and never reaches a caller — the last one becomes CoreUnavailableError.
+    retry, and never reaches a caller — the last one becomes CoreUnavailableError
+    or, when the upstream was throttling us, CoreRateLimitedError.
+
+    It carries the response for the same reason: `retry_async` duck-types on
+    `.response.headers` to honour `Retry-After`, so an upstream that says "come
+    back in 30 seconds" is obeyed instead of being second-guessed by our curve.
     """
+
+    def __init__(self, message: str, response: httpx.Response | None = None) -> None:
+        super().__init__(message)
+        self.response = response
 
 
 class CoreApiBookingRepository(BookingRepository):
@@ -144,6 +154,14 @@ class CoreApiBookingRepository(BookingRepository):
                 exc,
                 extra={"attempts": self._settings.max_attempts},
             )
+            if exc.response is not None and exc.response.status_code == httpx.codes.TOO_MANY_REQUESTS:
+                # Still throttled after the last attempt. Reporting this as
+                # "upstream is broken" would throw away the only actionable
+                # thing we were told, so the 429 and its Retry-After travel on.
+                retry_after = exc.response.headers.get("Retry-After")
+                raise CoreRateLimitedError(
+                    headers={"Retry-After": retry_after} if retry_after else None,
+                ) from exc
             raise CoreUnavailableError() from exc
 
     async def _send_once(
@@ -162,10 +180,13 @@ class CoreApiBookingRepository(BookingRepository):
         except httpx.TransportError as exc:
             raise _TransientError(f"{method} {path} failed to connect: {exc}") from exc
 
-        if response.status_code >= 500:
-            # Server-side and possibly momentary. A 4xx is not: repeating a
-            # rejected request just makes the guest wait for the same answer.
-            raise _TransientError(f"{method} {path} returned {response.status_code}")
+        if response.status_code >= 500 or response.status_code == httpx.codes.TOO_MANY_REQUESTS:
+            # Server-side and possibly momentary. 429 joins them because it is
+            # the one 4xx that says "ask again later" rather than "no": the
+            # upstream is fine, it just wants the traffic spread out. Every
+            # other 4xx is a rejection, and repeating a rejected request only
+            # makes the guest wait for the same answer.
+            raise _TransientError(f"{method} {path} returned {response.status_code}", response)
         if response.status_code >= 400:
             raise self._to_exception(response)
 

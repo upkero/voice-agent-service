@@ -48,7 +48,9 @@ async def handle_app_exception(request: Request, exc: BaseAppException) -> JSONR
             exc.detail,
             exc_info=exc,
         )
-    return error_response_from_exception(exc)
+    # `exc.headers` is what carries Retry-After out of a 429: without it the
+    # caller is told to wait and never told how long.
+    return _error_response(exc.status_code, exc.detail, exc.error_code, headers=exc.headers or None)
 
 
 async def handle_request_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
