@@ -17,7 +17,7 @@ services:
       timeout: 3s
       retries: 10
 
-  api:
+  voice-api:
     build:
       context: .
       target: api
@@ -57,7 +57,7 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
-  agent:
+  voice-agent:
     build:
       context: .
       target: agent
@@ -68,7 +68,7 @@ services:
       # ops-core-api runs from its own compose file. host.docker.internal is the
       # host as seen from a container on Docker Desktop; on plain Linux add
       # `extra_hosts: ["host.docker.internal:host-gateway"]` or join its network.
-      CORE_API_BASE_URL: ${CORE_API_BASE_URL:-http://host.docker.internal:8000}
+      OPS_CORE_BASE_URL: ${OPS_CORE_BASE_URL:-http://host.docker.internal:8000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
