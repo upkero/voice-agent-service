@@ -1,4 +1,4 @@
-"""Adapter: the BookingRepository port, spoken over HTTP to ops-core-api.
+"""Adapter: the BookingGateway port, spoken over HTTP to ops-core-api.
 
 The Adapter pattern earns its place here rather than being decoration. The port
 is shaped like a database repository, and this class is what makes an HTTP
@@ -29,7 +29,7 @@ from src.app.exceptions.booking import (
     SlotCapacityError,
     SlotTakenError,
 )
-from src.app.interfaces.repositories.booking_repository import BookingRepository
+from src.app.interfaces.booking_gateway import BookingGateway
 
 logger = getLogger(__name__)
 
@@ -70,7 +70,7 @@ class _TransientError(Exception):
         self.response = response
 
 
-class CoreApiBookingRepository(BookingRepository):
+class CoreApiBookingGateway(BookingGateway):
     def __init__(self, settings: CoreApiSettings, client: httpx.AsyncClient) -> None:
         self._settings = settings
         self._client = client
@@ -238,11 +238,11 @@ class CoreApiBookingRepository(BookingRepository):
         )
 
 
-def create_booking_repository(settings: CoreApiSettings) -> CoreApiBookingRepository:
+def create_booking_gateway(settings: CoreApiSettings) -> CoreApiBookingGateway:
     """Factory: the one place the HTTP client for ops-core-api is built."""
     client = httpx.AsyncClient(
         base_url=settings.base_url,
         timeout=settings.timeout_seconds,
         headers={"X-API-Key": settings.api_key.get_secret_value()},
     )
-    return CoreApiBookingRepository(settings, client)
+    return CoreApiBookingGateway(settings, client)

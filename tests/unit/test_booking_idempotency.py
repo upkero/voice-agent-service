@@ -13,7 +13,7 @@ from src.app.exceptions.booking import SlotTakenError
 from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
-from tests.fakes import TOMORROW, CancelledReplayRepository, FakeBookingRepository
+from tests.fakes import TOMORROW, CancelledReplayGateway, FakeBookingGateway
 
 
 async def _offer(reservations: ReservationService, state: DialogSessionState, party_size: int = 4) -> str:
@@ -113,7 +113,7 @@ async def test_a_consumed_key_is_recovered_exactly_once(reservations, state, rep
 async def test_a_cancelled_booking_is_never_reported_as_a_confirmation(state) -> None:
     """Telling a guest they have a table when they do not is the worst outcome
     this service can produce, so it fails loudly instead."""
-    service = ReservationService(CancelledReplayRepository(), NearestTimeRanking())
+    service = ReservationService(CancelledReplayGateway(), NearestTimeRanking())
     offers = await service.find_offers(state, TOMORROW, party_size=4, preferred_time=None)
 
     with pytest.raises(AssertionError, match="cancelled"):
@@ -136,8 +136,8 @@ async def test_the_key_does_not_leak_the_guest_name(reservations, state, reposit
     assert "Ostrovsky" not in repository.used_keys[0]
 
 
-async def test_a_fake_repository_is_a_real_booking_repository() -> None:
+async def test_a_fake_repository_is_a_real_booking_gateway() -> None:
     """The port has two implementations, which is what makes it a port."""
-    from src.app.interfaces.repositories.booking_repository import BookingRepository
+    from src.app.interfaces.booking_gateway import BookingGateway
 
-    assert isinstance(FakeBookingRepository(), BookingRepository)
+    assert isinstance(FakeBookingGateway(), BookingGateway)

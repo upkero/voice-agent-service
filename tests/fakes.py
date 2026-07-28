@@ -1,6 +1,6 @@
 """In-memory stand-ins for everything outside this service.
 
-FakeBookingRepository is the second implementation of the BookingRepository
+FakeBookingGateway is the second implementation of the BookingGateway
 port, which is what makes the port more than decoration: if the services can be
 driven by an in-memory dict as easily as by HTTP, then they really do not know
 which one they have.
@@ -17,8 +17,8 @@ from src.app.exceptions.booking import (
     IdempotencyKeyConsumedError,
     SlotTakenError,
 )
+from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.interfaces.livekit_gateway import LiveKitGateway
-from src.app.interfaces.repositories.booking_repository import BookingRepository
 
 TOMORROW = date(2026, 7, 24)
 
@@ -37,7 +37,7 @@ def seeded_slots(slot_date: date = TOMORROW) -> list[SlotDTO]:
     ]
 
 
-class FakeBookingRepository(BookingRepository):
+class FakeBookingGateway(BookingGateway):
     def __init__(self, slots: Sequence[SlotDTO] | None = None) -> None:
         self.slots: dict[UUID, SlotDTO] = {slot.id: slot for slot in (slots or seeded_slots())}
         self.taken: set[UUID] = set()
@@ -119,7 +119,7 @@ class FakeBookingRepository(BookingRepository):
         return cancelled
 
 
-class UnavailableBookingRepository(BookingRepository):
+class UnavailableBookingGateway(BookingGateway):
     """Every call fails the way an unreachable ops-core-api fails."""
 
     async def list_available_slots(self, slot_date: date, party_size: int) -> Sequence[SlotDTO]:
@@ -141,7 +141,7 @@ class UnavailableBookingRepository(BookingRepository):
         raise CoreUnavailableError()
 
 
-class CancelledReplayRepository(FakeBookingRepository):
+class CancelledReplayGateway(FakeBookingGateway):
     """Returns a cancelled booking from a create call.
 
     Represents a regressed or older ops-core-api. Nothing should ever answer a

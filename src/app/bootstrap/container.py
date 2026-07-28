@@ -12,11 +12,11 @@ from functools import cached_property
 from src.app.core.settings.agent import get_agent_settings
 from src.app.core.settings.core_api import get_core_api_settings
 from src.app.core.settings.livekit import get_livekit_settings
+from src.app.gateways.core_api_booking import create_booking_gateway
 from src.app.gateways.livekit_probe import LiveKitApiGateway
 from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
+from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.interfaces.livekit_gateway import LiveKitGateway
-from src.app.interfaces.repositories.booking_repository import BookingRepository
-from src.app.repositories.core_api_booking import create_booking_repository
 from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.flow import RestaurantBookingFlow
@@ -33,8 +33,8 @@ class ApplicationContainer:
         return LiveKitApiGateway(get_livekit_settings())
 
     @cached_property
-    def booking_repository(self) -> BookingRepository:
-        return create_booking_repository(get_core_api_settings())
+    def booking_gateway(self) -> BookingGateway:
+        return create_booking_gateway(get_core_api_settings())
 
     @cached_property
     def slot_ranking(self) -> SlotRankingStrategy:
@@ -45,7 +45,7 @@ class ApplicationContainer:
 
     @cached_property
     def reservation_service(self) -> ReservationService:
-        return ReservationService(self.booking_repository, self.slot_ranking)
+        return ReservationService(self.booking_gateway, self.slot_ranking)
 
     @cached_property
     def dialog_flow(self) -> RestaurantBookingFlow:

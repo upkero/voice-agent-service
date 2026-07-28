@@ -13,7 +13,7 @@ from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.phrases import phrase
 from src.app.services.dialog.tools import TOOL_SCHEMAS, BookingTools
-from tests.fakes import TOMORROW, UnavailableBookingRepository
+from tests.fakes import TOMORROW, UnavailableBookingGateway
 
 VALID_AVAILABILITY = {"booking_date": TOMORROW.isoformat(), "party_size": 4, "preferred_time": "19:00"}
 
@@ -114,7 +114,7 @@ async def test_an_outage_becomes_a_sentence_rather_than_an_exception(agent_setti
     # Inject the fixed clock like the shared `tools` fixture, so TOMORROW stays
     # a future date whatever the real calendar says when the suite runs.
     tools = BookingTools(
-        ReservationService(UnavailableBookingRepository(), NearestTimeRanking()),
+        ReservationService(UnavailableBookingGateway(), NearestTimeRanking()),
         state,
         agent_settings,
         today=lambda: TOMORROW - timedelta(days=1),

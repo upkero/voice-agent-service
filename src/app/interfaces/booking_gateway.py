@@ -6,7 +6,7 @@ from uuid import UUID
 from src.app.contracts.booking import BookingDTO, SlotDTO
 
 
-class BookingRepository(ABC):
+class BookingGateway(ABC):
     """The port through which this service reaches booking data.
 
     Deliberately identical in shape to a direct database repository even though

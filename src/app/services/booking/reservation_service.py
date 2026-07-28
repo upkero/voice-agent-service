@@ -13,7 +13,7 @@ from logging import getLogger
 from src.app.contracts.booking import BookingStatus, BookingSummary, SlotOffer
 from src.app.exceptions.booking import IdempotencyKeyConsumedError
 from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
-from src.app.interfaces.repositories.booking_repository import BookingRepository
+from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.services.dialog.session_state import DialogSessionState
 
 logger = getLogger(__name__)
@@ -25,7 +25,7 @@ MAX_OFFERS = 3
 
 
 class ReservationService:
-    def __init__(self, bookings: BookingRepository, ranking: SlotRankingStrategy) -> None:
+    def __init__(self, bookings: BookingGateway, ranking: SlotRankingStrategy) -> None:
         self._bookings = bookings
         self._ranking = ranking
 

@@ -1,6 +1,6 @@
 """The adapter's own behaviour, driven through a stubbed transport.
 
-Everything else in this suite talks to FakeBookingRepository, which is the point
+Everything else in this suite talks to FakeBookingGateway, which is the point
 of the port — but the mapping from HTTP to typed exceptions lives here and has no
 other home. httpx.MockTransport is the smallest way to exercise it without a
 server.
@@ -13,14 +13,14 @@ import pytest
 
 from src.app.core.settings.core_api import CoreApiSettings
 from src.app.exceptions.booking import CoreRateLimitedError, CoreUnavailableError
-from src.app.repositories.core_api_booking import CoreApiBookingRepository
+from src.app.gateways.core_api_booking import CoreApiBookingGateway
 
 SETTINGS = CoreApiSettings(api_key="test-key-1234567890", max_attempts=2)  # type: ignore[call-arg]
 
 
-def _repository(handler: httpx.MockTransport) -> CoreApiBookingRepository:
+def _repository(handler: httpx.MockTransport) -> CoreApiBookingGateway:
     client = httpx.AsyncClient(transport=handler, base_url="http://core.test")
-    return CoreApiBookingRepository(SETTINGS, client)
+    return CoreApiBookingGateway(SETTINGS, client)
 
 
 async def test_exhausted_429_surfaces_as_429_with_retry_after() -> None:
