@@ -82,12 +82,16 @@ async def start_session(
     ctx: JobContext,
     notice: DegradationNotice,
 ) -> None:
-    """Start the pipeline, and keep the call alive if the audio path fails.
+    """Start the pipeline, or fail the job.
 
-    A failure here is the worst-timed one there is: the guest has connected and
-    is waiting. Falling through to text keeps a usable conversation instead of
-    an empty room, because everything below the audio layer — the LLM, the
-    tools, the booking — still works.
+    There is no text fallback at this point, and it would be dishonest to
+    pretend otherwise: `text_enabled` is an option *of* the session, so if
+    `session.start` is what failed there is no session to receive typed messages
+    either. All this does is get one last sentence out over the data channel —
+    which may still be open, since ctx.connect() succeeded — before the job dies
+    and the room closes. The real fallbacks are elsewhere: a second STT/TTS
+    provider behind the FallbackAdapter, and text input on a session that did
+    start.
     """
     language = get_agent_settings().language
     try:
@@ -104,7 +108,7 @@ async def start_session(
             ),
         )
     except Exception:
-        logger.exception("Voice pipeline failed to start; continuing in text mode")
+        logger.exception("Voice pipeline failed to start; failing the job")
         await notice.announce_once("startup", degradation_message(language, "startup"))
         raise
 

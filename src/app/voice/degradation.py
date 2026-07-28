@@ -77,12 +77,14 @@ DEGRADATION_MESSAGES: dict[str, dict[str, str]] = {
     "ru": {
         "tts": "Голос сейчас недоступен — отвечаю текстом в этом чате.",
         "stt": "Я вас не слышу — микрофон или распознавание недоступны. Напишите, пожалуйста, сообщением.",
-        "startup": "Голосовой канал не поднялся. Отвечаю текстом.",
+        # No promise of a text conversation here: if the session itself failed to
+        # start, there is nothing left to answer on and the room is closing.
+        "startup": "Не могу принять звонок — техническая неполадка. Перезвоните, пожалуйста.",
     },
     "en": {
         "tts": "My voice is unavailable right now — I'll answer here in the chat.",
         "stt": "I can't hear you — speech recognition is unavailable. Please type instead.",
-        "startup": "The voice channel failed to start. I'll answer in text.",
+        "startup": "I can't take the call — something has gone wrong on our side. Please call back.",
     },
 }
 

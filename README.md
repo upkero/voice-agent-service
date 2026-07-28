@@ -194,7 +194,7 @@ and it is checkable.
 | ops-core-api down / 5xx | A spoken sentence ("I can't reach the diary right now — shall I take your number?"). No exception reaches the pipeline. |
 | TTS provider fails | The reply text is published to the room's data channel and the problem is announced once. The session stays up. |
 | STT provider fails | Мила says she cannot hear (TTS still works); text input stays enabled, so the same LLM + tools loop works by typing. |
-| Both fail at start | The reason is published to the data channel and logged, instead of an empty room. |
+| The session itself fails to start | The job fails and the room closes. One last sentence goes out over the data channel first, but there is no text fallback here: `text_enabled` is an option *of* the session, so a session that never started cannot receive typed messages either. |
 
 ## Design notes worth reading
 
