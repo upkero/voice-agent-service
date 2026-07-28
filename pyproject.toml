@@ -13,7 +13,11 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
     "httpx>=0.28.0",
     "tenacity>=9.0.0",
-    "slowapi>=0.1.9",
+    # Used directly by api/v1/middleware/rate_limit.py. It used to arrive
+    # transitively through slowapi, whose decorators this service never used.
+    "limits>=5.0.0",
+    # Used directly by gateways/livekit_probe.py; transitive from livekit-api.
+    "aiohttp>=3.10.0",
     "openai>=1.60.0",
     "livekit-api>=1.0.0",
     "livekit-agents>=1.6.0",
@@ -51,9 +55,13 @@ explicit_package_bases = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["faster_whisper.*", "slowapi.*", "livekit.plugins.*"]
+module = ["faster_whisper.*", "livekit.plugins.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Load-bearing since tests/__init__.py was deleted: without it `from src.app…`
+# in a test resolves only as a side effect of pytest walking up to the first
+# directory without an __init__.py. Stating it beats relying on the walk.
+pythonpath = ["."]
