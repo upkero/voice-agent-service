@@ -48,7 +48,9 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allowed_origins,
-        allow_credentials="*" not in settings.cors_allowed_origins,
+        # Explicit: this API takes no cookie and no browser credential — the
+        # caller is anonymous and the token endpoint is rate limited instead.
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
