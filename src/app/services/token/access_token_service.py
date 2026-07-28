@@ -14,19 +14,13 @@ from livekit import api
 
 from src.app.contracts.token import AccessTokenDTO
 from src.app.core.settings.livekit import LiveKitSettings
-from src.app.exceptions.base import BaseAppException
+from src.app.exceptions.token import InvalidRoomNameError
 
 # LiveKit accepts a fairly free-form room name, but anything that travels in a
 # URL and lands in logs is worth pinning down. Letters, digits, dash and
 # underscore only.
 _ROOM_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _PARTICIPANT_NAME_MAX = 64
-
-
-class InvalidRoomNameError(BaseAppException):
-    status_code = 422
-    error_code = "invalid_room_name"
-    default_detail = "Room name may contain only letters, digits, dashes and underscores."
 
 
 class AccessTokenService:

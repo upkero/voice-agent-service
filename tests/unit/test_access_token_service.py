@@ -6,8 +6,9 @@ import pytest
 from pydantic import SecretStr
 
 from src.app.core.settings.livekit import LiveKitSettings
+from src.app.exceptions.token import InvalidRoomNameError
 from src.app.gateways.livekit_probe import to_http_url
-from src.app.services.token.access_token_service import AccessTokenService, InvalidRoomNameError
+from src.app.services.token.access_token_service import AccessTokenService
 
 SECRET = "test-livekit-secret-value-at-least-32-bytes"
 
