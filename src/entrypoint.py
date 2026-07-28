@@ -17,6 +17,7 @@ from livekit.plugins import silero
 
 from src.app.bootstrap.container import ApplicationContainer
 from src.app.core.logging import setup_logging
+from src.app.core.request_id import set_request_id
 from src.app.core.settings.agent import get_agent_settings
 from src.app.core.settings.livekit import get_livekit_settings
 from src.app.core.settings.logging import get_logging_settings
@@ -49,6 +50,13 @@ async def entrypoint(ctx: JobContext) -> None:
     """
     container = ApplicationContainer()
     room_name = ctx.room.name
+    # No HTTP request wraps a job, so the ContextVar the outbound client reads
+    # is empty and every call this worker makes to ops-core-api would arrive
+    # uncorrelated — half this service's traffic. The room name is the natural
+    # key: it is already in every log line on this side, and one call is one
+    # room, so it joins the two sides of a booking without inventing an id
+    # nobody can look up.
+    set_request_id(f"room-{room_name}")
     agent, state = build_agent(container, room_name)
     notice = DegradationNotice(ctx.room)
     tracker = ConfirmationTracker(state)

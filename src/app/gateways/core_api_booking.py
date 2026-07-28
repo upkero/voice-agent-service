@@ -17,6 +17,7 @@ from uuid import UUID
 import httpx
 
 from src.app.contracts.booking import BookingDTO, BookingStatus, SlotDTO
+from src.app.core.request_id import get_request_id
 from src.app.core.resilience import retry_async
 from src.app.core.settings.core_api import CoreApiSettings
 from src.app.exceptions.booking import (
@@ -238,11 +239,24 @@ class CoreApiBookingGateway(BookingGateway):
         )
 
 
+async def _inject_request_id(request: httpx.Request) -> None:
+    """Carry the caller's request id into ops-core-api's logs.
+
+    An event hook rather than a static header, because the client is built once
+    per process and the id is per call. Without this the two services' logs
+    cannot be joined for the same booking, which is precisely the moment anyone
+    goes looking.
+    """
+    if request_id := get_request_id():
+        request.headers["X-Request-ID"] = request_id
+
+
 def create_booking_gateway(settings: CoreApiSettings) -> CoreApiBookingGateway:
     """Factory: the one place the HTTP client for ops-core-api is built."""
     client = httpx.AsyncClient(
         base_url=settings.base_url,
         timeout=settings.timeout_seconds,
         headers={"X-API-Key": settings.api_key.get_secret_value()},
+        event_hooks={"request": [_inject_request_id]},
     )
     return CoreApiBookingGateway(settings, client)
