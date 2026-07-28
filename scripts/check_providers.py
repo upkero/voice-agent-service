@@ -19,8 +19,11 @@ failure, so it doubles as a pre-flight check in a script.
 
 import asyncio
 import sys
+from typing import cast
 
 from livekit import rtc
+from openai.types.chat import ChatCompletionFunctionToolParam
+from openai.types.shared_params import FunctionDefinition
 
 from src.app.core.settings.agent import get_agent_settings
 from src.app.core.settings.llm import get_llm_settings
@@ -105,7 +108,9 @@ async def check_llm_tool_call() -> None:
     print(f"{_DIM}LLM  {settings.provider} / {settings.model}{_OFF}")
 
     client = AsyncOpenAI(api_key=settings.api_key or "x", base_url=settings.base_url, timeout=30.0)
-    tools = [{"type": "function", "function": schema} for schema in TOOL_SCHEMAS]
+    tools: list[ChatCompletionFunctionToolParam] = [
+        {"type": "function", "function": cast(FunctionDefinition, schema)} for schema in TOOL_SCHEMAS
+    ]
     completion = await client.chat.completions.create(
         model=settings.model,
         messages=[
@@ -117,7 +122,10 @@ async def check_llm_tool_call() -> None:
     )
     await client.close()
 
-    calls = completion.choices[0].message.tool_calls or []
+    # The SDK types tool_calls as a union that also covers custom (non-function)
+    # tools. Only the function variant has .function, and only that one is what
+    # this service dispatches, so anything else is not the call we asked for.
+    calls = [call for call in (completion.choices[0].message.tool_calls or []) if call.type == "function"]
     if not calls:
         _fail(f"model answered without calling a tool: {completion.choices[0].message.content!r}")
         raise SystemExit(1)

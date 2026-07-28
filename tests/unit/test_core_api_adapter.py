@@ -15,7 +15,7 @@ from src.app.core.settings.core_api import CoreApiSettings
 from src.app.exceptions.booking import CoreRateLimitedError, CoreUnavailableError
 from src.app.gateways.core_api_booking import CoreApiBookingGateway
 
-SETTINGS = CoreApiSettings(api_key="test-key-1234567890", max_attempts=2)  # type: ignore[call-arg]
+SETTINGS = CoreApiSettings(api_key="test-key-1234567890", max_attempts=2)
 
 
 def _repository(handler: httpx.MockTransport) -> CoreApiBookingGateway:

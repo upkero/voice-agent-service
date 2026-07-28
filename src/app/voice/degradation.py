@@ -12,15 +12,34 @@ technically published and practically invisible.
 """
 
 from logging import getLogger
-
-from livekit import rtc
+from typing import Any, Protocol
 
 logger = getLogger(__name__)
 
 CHAT_TOPIC = "lk.chat"
 
 
-async def announce(room: rtc.Room, text: str) -> bool:
+class _TextPublisher(Protocol):
+    async def send_text(self, text: str, *, topic: str = ...) -> Any: ...
+
+
+class ChatRoom(Protocol):
+    """The two things announcing needs from a room: a name for the log line and
+    somebody to publish through.
+
+    A structural type rather than `rtc.Room` because this is the path that runs
+    when everything else is broken, and it is worth being able to test without a
+    live WebRTC connection. `rtc.Room` satisfies it as it stands.
+    """
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def local_participant(self) -> _TextPublisher: ...
+
+
+async def announce(room: ChatRoom, text: str) -> bool:
     """Publish a line of text to everyone in the room.
 
     Returns whether it went out. Never raises: this is the fallback path, and a
@@ -42,7 +61,7 @@ class DegradationNotice:
     kind of broken. The first message is the useful one.
     """
 
-    def __init__(self, room: rtc.Room) -> None:
+    def __init__(self, room: ChatRoom) -> None:
         self._room = room
         self._announced: set[str] = set()
 

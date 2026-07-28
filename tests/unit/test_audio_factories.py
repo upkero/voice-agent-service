@@ -17,11 +17,11 @@ from src.app.llm.tts_factory import create_tts
 # _env_file=None so these construct from the given kwargs alone, not the
 # project .env — otherwise a key sitting in .env would mask a validation test.
 def _stt(**kw: object) -> STTSettings:
-    return STTSettings(_env_file=None, **kw)  # type: ignore[arg-type,call-arg]
+    return STTSettings(_env_file=None, **kw)  # type: ignore[arg-type]
 
 
 def _tts(**kw: object) -> TTSSettings:
-    return TTSSettings(_env_file=None, **kw)  # type: ignore[arg-type,call-arg]
+    return TTSSettings(_env_file=None, **kw)  # type: ignore[arg-type]
 
 
 # --- STT provider selection ---------------------------------------------------

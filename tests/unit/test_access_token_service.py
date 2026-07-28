@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Any
 
 import jwt
 import pytest
@@ -23,7 +24,7 @@ def service() -> AccessTokenService:
     )
 
 
-def _claims(token: str) -> dict:
+def _claims(token: str) -> dict[str, Any]:
     return jwt.decode(token, SECRET, algorithms=["HS256"])
 
 

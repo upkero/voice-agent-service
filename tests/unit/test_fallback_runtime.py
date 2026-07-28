@@ -17,7 +17,7 @@ from livekit.agents.language import LanguageCode
 from livekit.agents.types import NOT_GIVEN, APIConnectOptions
 
 
-class _FakeSTT(stt.STT):
+class _FakeSTT(stt.STT[None]):
     def __init__(self, *, text: str | None) -> None:
         # streaming=True so FallbackAdapter needs no VAD to hold it.
         super().__init__(capabilities=stt.STTCapabilities(streaming=True, interim_results=False))

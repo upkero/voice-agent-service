@@ -4,6 +4,9 @@ Anything except silence. A caller who hears nothing cannot tell a broken speech
 engine from a dropped line, and hangs up either way.
 """
 
+from uuid import uuid4
+
+from src.app.contracts.booking import BookingDTO, BookingStatus
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import CHAT_TOPIC, DegradationNotice, announce, degradation_message
@@ -59,6 +62,11 @@ def test_an_unknown_language_falls_back_rather_than_going_quiet() -> None:
     assert degradation_message("de", "tts") == degradation_message("en", "tts")
 
 
+def _booking() -> BookingDTO:
+    """A table taken in this call — the tracker only cares that one exists."""
+    return BookingDTO(id=uuid4(), guest_name="Anna", slot_id=uuid4(), party_size=2, status=BookingStatus.ACTIVE)
+
+
 class _Item:
     def __init__(self, role: str, interrupted: bool = False) -> None:
         self.role = role
@@ -82,7 +90,7 @@ def test_confirmation_is_not_claimed_without_a_booking() -> None:
 def test_an_interrupted_reply_does_not_count_as_confirmation() -> None:
     """If the guest talked over it, there is no reason to think it landed."""
     state = DialogSessionState("room-1")
-    state._bookings["booking_1"] = object()  # noqa: SLF001 - simulating a taken table
+    state._bookings["booking_1"] = _booking()  # noqa: SLF001 - simulating a taken table
     tracker = ConfirmationTracker(state)
 
     tracker.on_conversation_item(_Event(_Item("assistant", interrupted=True)))
@@ -92,7 +100,7 @@ def test_an_interrupted_reply_does_not_count_as_confirmation() -> None:
 
 def test_a_completed_reply_after_a_booking_counts() -> None:
     state = DialogSessionState("room-1")
-    state._bookings["booking_1"] = object()  # noqa: SLF001
+    state._bookings["booking_1"] = _booking()  # noqa: SLF001
     tracker = ConfirmationTracker(state)
 
     tracker.on_conversation_item(_Event(_Item("assistant")))
@@ -102,7 +110,7 @@ def test_a_completed_reply_after_a_booking_counts() -> None:
 
 def test_a_user_turn_is_not_a_confirmation() -> None:
     state = DialogSessionState("room-1")
-    state._bookings["booking_1"] = object()  # noqa: SLF001
+    state._bookings["booking_1"] = _booking()  # noqa: SLF001
     tracker = ConfirmationTracker(state)
 
     tracker.on_conversation_item(_Event(_Item("user")))
