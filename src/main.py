@@ -45,20 +45,28 @@ def create_app() -> FastAPI:
     )
 
     settings = get_app_settings()
+
+    # Middleware is registered inside-out: Starlette prepends each one, so the
+    # LAST registered runs FIRST. The order below produces the runtime chain
+    #     CORS -> request_id -> rate_limit -> routes
+    # POST /api/v1/token is called from a browser, and the rate limit middleware
+    # short-circuits with 429. That response has to travel back out through CORS,
+    # or the rejection reaches the frontend as an opaque "Failed to fetch"
+    # instead of a status it can read. CORS outermost also answers the OPTIONS
+    # preflight before the limiter counts it — the limiter compares the path
+    # only, so a preflight would otherwise spend the guest's quota.
+    register_rate_limiting(app)
+    register_request_id_middleware(app)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allowed_origins,
         # Explicit: this API takes no cookie and no browser credential — the
         # caller is anonymous and the token endpoint is rate limited instead.
         allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "X-Request-ID"],
     )
 
-    # Order matters: rate limiting is registered last so it runs first, and a
-    # flood is rejected before anything else does work on it.
-    register_request_id_middleware(app)
-    register_rate_limiting(app)
     register_exception_handlers(app)
 
     app.include_router(health_router)
