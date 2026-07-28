@@ -9,7 +9,9 @@ from src.app.services.dialog.session_state import DialogSessionState
 from tests.fakes import TOMORROW, FakeBookingGateway, UnavailableBookingGateway, make_slot, seeded_slots
 
 
-async def test_offers_the_nearest_times_to_the_request(reservations, state) -> None:
+async def test_offers_the_nearest_times_to_the_request(
+    reservations: ReservationService, state: DialogSessionState
+) -> None:
     """The demo phrase: a table for four at 19:00, against the real seed data.
 
     There is no 19:00 slot. Answering "no" would be correct and useless; the
@@ -20,14 +22,16 @@ async def test_offers_the_nearest_times_to_the_request(reservations, state) -> N
     assert [offer.slot.slot_time.strftime("%H:%M") for offer in offers] == ["19:30", "18:00", "13:30"]
 
 
-async def test_offers_exclude_tables_that_are_too_small(reservations, state) -> None:
+async def test_offers_exclude_tables_that_are_too_small(
+    reservations: ReservationService, state: DialogSessionState
+) -> None:
     offers = await reservations.find_offers(state, TOMORROW, party_size=5, preferred_time=None)
 
     # Only the 19:30 table seats six; the 12:00 two-seater must not be offered.
     assert [offer.slot.capacity for offer in offers] == [6]
 
 
-async def test_offers_are_capped(state) -> None:
+async def test_offers_are_capped(state: DialogSessionState) -> None:
     """A guest cannot hold a read-out list of six times in their head."""
     many = [make_slot(hour, 0, 6) for hour in range(12, 22)]
     service = ReservationService(FakeBookingGateway(many), NearestTimeRanking())
@@ -37,13 +41,17 @@ async def test_offers_are_capped(state) -> None:
     assert len(offers) == MAX_OFFERS
 
 
-async def test_no_free_tables_returns_nothing_rather_than_failing(reservations, state) -> None:
+async def test_no_free_tables_returns_nothing_rather_than_failing(
+    reservations: ReservationService, state: DialogSessionState
+) -> None:
     offers = await reservations.find_offers(state, date(2026, 12, 25), party_size=2, preferred_time=None)
 
     assert offers == []
 
 
-async def test_reserving_marks_the_slot_taken(reservations, state, repository) -> None:
+async def test_reserving_marks_the_slot_taken(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     offers = await reservations.find_offers(state, TOMORROW, party_size=4, preferred_time=time(19, 0))
 
     summary = await reservations.reserve(state, offers[0].ref, "Ivanov", 4)
@@ -53,7 +61,9 @@ async def test_reserving_marks_the_slot_taken(reservations, state, repository) -
     assert offers[0].slot.id in repository.taken
 
 
-async def test_reserving_an_unoffered_reference_never_reaches_the_repository(reservations, state, repository) -> None:
+async def test_reserving_an_unoffered_reference_never_reaches_the_repository(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     """A hallucinated reference must fail locally, not be resolved remotely."""
     from src.app.exceptions.booking import UnknownReferenceError
 
@@ -63,14 +73,16 @@ async def test_reserving_an_unoffered_reference_never_reaches_the_repository(res
     assert repository.calls == []
 
 
-async def test_core_outage_surfaces_as_a_typed_failure(state) -> None:
+async def test_core_outage_surfaces_as_a_typed_failure(state: DialogSessionState) -> None:
     service = ReservationService(UnavailableBookingGateway(), NearestTimeRanking())
 
     with pytest.raises(CoreUnavailableError):
         await service.find_offers(state, TOMORROW, party_size=2, preferred_time=None)
 
 
-async def test_a_new_availability_check_invalidates_the_previous_offers(reservations, state) -> None:
+async def test_a_new_availability_check_invalidates_the_previous_offers(
+    reservations: ReservationService, state: DialogSessionState
+) -> None:
     """Offers describe one answer; keeping stale ones lets a guest accept a
     table that was withdrawn two questions ago."""
     first = await reservations.find_offers(state, TOMORROW, party_size=6, preferred_time=None)
@@ -81,7 +93,9 @@ async def test_a_new_availability_check_invalidates_the_previous_offers(reservat
     assert state.resolve_slot("slot_1").slot_time == time(12, 0)
 
 
-async def test_find_existing_returns_speakable_summaries(reservations, state) -> None:
+async def test_find_existing_returns_speakable_summaries(
+    reservations: ReservationService, state: DialogSessionState
+) -> None:
     offers = await reservations.find_offers(state, TOMORROW, party_size=4, preferred_time=None)
     await reservations.reserve(state, offers[0].ref, "Petrova", 4)
 

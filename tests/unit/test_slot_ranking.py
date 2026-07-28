@@ -1,10 +1,12 @@
+from collections.abc import Sequence
 from datetime import time
 
+from src.app.contracts.booking import SlotDTO
 from src.app.services.booking.ranking import EarliestFirstRanking, NearestTimeRanking
 from tests.fakes import make_slot, seeded_slots
 
 
-def _times(slots) -> list[str]:
+def _times(slots: Sequence[SlotDTO]) -> list[str]:
     return [slot.slot_time.strftime("%H:%M") for slot in slots]
 
 

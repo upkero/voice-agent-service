@@ -21,7 +21,9 @@ async def _offer(reservations: ReservationService, state: DialogSessionState, pa
     return offers[0].ref
 
 
-async def test_the_model_calling_create_twice_books_one_table(reservations, state, repository) -> None:
+async def test_the_model_calling_create_twice_books_one_table(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     ref = await _offer(reservations, state)
 
     first = await reservations.reserve(state, ref, "Ivanov", 4)
@@ -34,7 +36,9 @@ async def test_the_model_calling_create_twice_books_one_table(reservations, stat
     assert first.ref == second.ref
 
 
-async def test_the_key_changes_with_the_party_size(reservations, state, repository) -> None:
+async def test_the_key_changes_with_the_party_size(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     """Different arguments must not collide on one key.
 
     The second attempt is rejected because the table is already taken — which
@@ -49,7 +53,9 @@ async def test_the_key_changes_with_the_party_size(reservations, state, reposito
     assert repository.used_keys[0] != repository.used_keys[1]
 
 
-async def test_the_key_changes_with_the_guest_name(reservations, state, repository) -> None:
+async def test_the_key_changes_with_the_guest_name(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     ref = await _offer(reservations, state)
     await reservations.reserve(state, ref, "Ivanov", 4)
     with pytest.raises(SlotTakenError):
@@ -58,7 +64,7 @@ async def test_the_key_changes_with_the_guest_name(reservations, state, reposito
     assert repository.used_keys[0] != repository.used_keys[1]
 
 
-async def test_two_calls_never_share_a_key(reservations, repository) -> None:
+async def test_two_calls_never_share_a_key(reservations: ReservationService, repository: FakeBookingGateway) -> None:
     """Different rooms are different conversations, whatever was said in them."""
     first_call = DialogSessionState("room-a")
     second_call = DialogSessionState("room-b")
@@ -70,7 +76,9 @@ async def test_two_calls_never_share_a_key(reservations, repository) -> None:
     assert repository.used_keys[0] != repository.used_keys[1]
 
 
-async def test_rebooking_after_a_cancellation_takes_a_real_table(reservations, state, repository) -> None:
+async def test_rebooking_after_a_cancellation_takes_a_real_table(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     """The case the whole intent counter exists for.
 
     Same table, same name, same party size, in the same call. Without a fresh
@@ -90,7 +98,9 @@ async def test_rebooking_after_a_cancellation_takes_a_real_table(reservations, s
     assert len(active) == 1
 
 
-async def test_a_consumed_key_is_recovered_exactly_once(reservations, state, repository) -> None:
+async def test_a_consumed_key_is_recovered_exactly_once(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     """If the counter ever misses a path, the guest still gets their table.
 
     The recovery is deliberately one-shot: a loop here would hammer the booking
@@ -110,7 +120,7 @@ async def test_a_consumed_key_is_recovered_exactly_once(reservations, state, rep
     assert repository.calls.count("create_booking") == attempts_before + 2  # the refusal, then the new key
 
 
-async def test_a_cancelled_booking_is_never_reported_as_a_confirmation(state) -> None:
+async def test_a_cancelled_booking_is_never_reported_as_a_confirmation(state: DialogSessionState) -> None:
     """Telling a guest they have a table when they do not is the worst outcome
     this service can produce, so it fails loudly instead."""
     service = ReservationService(CancelledReplayGateway(), NearestTimeRanking())
@@ -120,7 +130,9 @@ async def test_a_cancelled_booking_is_never_reported_as_a_confirmation(state) ->
         await service.reserve(state, offers[0].ref, "Ivanov", 4)
 
 
-async def test_the_key_fits_the_header_limit(reservations, state, repository) -> None:
+async def test_the_key_fits_the_header_limit(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     """ops-core-api caps Idempotency-Key at 64 characters."""
     ref = await _offer(reservations, state)
     await reservations.reserve(state, ref, "Ivanov", 4)
@@ -128,7 +140,9 @@ async def test_the_key_fits_the_header_limit(reservations, state, repository) ->
     assert len(repository.used_keys[0]) == 64
 
 
-async def test_the_key_does_not_leak_the_guest_name(reservations, state, repository) -> None:
+async def test_the_key_does_not_leak_the_guest_name(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     """It travels in a header and lands in access logs, so it is a hash."""
     ref = await _offer(reservations, state)
     await reservations.reserve(state, ref, "Ostrovsky", 4)

@@ -59,7 +59,7 @@ def test_a_booking_from_this_call_is_cancelled_without_a_lookup() -> None:
 
 
 @pytest.mark.parametrize(("language", "expected"), [("ru", "Russian"), ("en", "English")])
-def test_the_persona_states_the_language(language, expected) -> None:
+def test_the_persona_states_the_language(language: str, expected: str) -> None:
     assert expected in _flow(language).persona()
 
 

@@ -27,7 +27,7 @@ def _claims(token: str) -> dict:
     return jwt.decode(token, SECRET, algorithms=["HS256"])
 
 
-def test_the_token_grants_joining_one_named_room(service) -> None:
+def test_the_token_grants_joining_one_named_room(service: AccessTokenService) -> None:
     issued = service.issue("Anna", room_name="table-42")
 
     grants = _claims(issued.token)["video"]
@@ -36,7 +36,7 @@ def test_the_token_grants_joining_one_named_room(service) -> None:
     assert issued.room_name == "table-42"
 
 
-def test_the_token_grants_nothing_administrative(service) -> None:
+def test_the_token_grants_nothing_administrative(service: AccessTokenService) -> None:
     """It is minted without a credential, so it must not be able to create
     rooms, list them or administer anything."""
     grants = _claims(service.issue("Anna").token)["video"]
@@ -45,13 +45,13 @@ def test_the_token_grants_nothing_administrative(service) -> None:
         assert not grants.get(forbidden), forbidden
 
 
-def test_data_publishing_is_granted(service) -> None:
+def test_data_publishing_is_granted(service: AccessTokenService) -> None:
     """The degraded path speaks over the data channel; a token that cannot
     receive it would turn a degraded call into a silent one."""
     assert _claims(service.issue("Anna").token)["video"]["canPublishData"] is True
 
 
-def test_an_omitted_room_gets_a_private_one(service) -> None:
+def test_an_omitted_room_gets_a_private_one(service: AccessTokenService) -> None:
     first = service.issue("Anna")
     second = service.issue("Boris")
 
@@ -59,7 +59,7 @@ def test_an_omitted_room_gets_a_private_one(service) -> None:
     assert first.room_name.startswith("booking-")
 
 
-def test_identities_are_unique_for_identical_names(service) -> None:
+def test_identities_are_unique_for_identical_names(service: AccessTokenService) -> None:
     """LiveKit treats a repeated identity as the same participant reconnecting,
     so two guests sharing one would evict each other."""
     first = service.issue("guest")
@@ -68,7 +68,7 @@ def test_identities_are_unique_for_identical_names(service) -> None:
     assert first.participant_name != second.participant_name
 
 
-def test_a_non_ascii_name_still_yields_a_usable_identity(service) -> None:
+def test_a_non_ascii_name_still_yields_a_usable_identity(service: AccessTokenService) -> None:
     issued = service.issue("Мила")
 
     assert issued.participant_name.startswith("guest-")
@@ -78,12 +78,12 @@ def test_a_non_ascii_name_still_yields_a_usable_identity(service) -> None:
 
 
 @pytest.mark.parametrize("bad", ["has space", "semi;colon", "slash/es", "quote'", "../escape"])
-def test_hostile_room_names_are_refused(service, bad) -> None:
+def test_hostile_room_names_are_refused(service: AccessTokenService, bad: str) -> None:
     with pytest.raises(InvalidRoomNameError):
         service.issue("Anna", room_name=bad)
 
 
-def test_the_token_expires(service) -> None:
+def test_the_token_expires(service: AccessTokenService) -> None:
     issued = service.issue("Anna")
     claims = _claims(issued.token)
 
@@ -91,7 +91,7 @@ def test_the_token_expires(service) -> None:
     assert issued.expires_at > datetime.now(UTC)
 
 
-def test_the_url_is_handed_back_for_the_client_to_connect_to(service) -> None:
+def test_the_url_is_handed_back_for_the_client_to_connect_to(service: AccessTokenService) -> None:
     assert service.issue("Anna").livekit_url == "ws://livekit-test:7880"
 
 
@@ -103,6 +103,6 @@ def test_the_url_is_handed_back_for_the_client_to_connect_to(service) -> None:
         ("http://already-http:7880", "http://already-http:7880"),
     ],
 )
-def test_the_management_url_is_derived_from_the_signalling_one(signalling, management) -> None:
+def test_the_management_url_is_derived_from_the_signalling_one(signalling: str, management: str) -> None:
     """One setting rather than two, because two eventually disagree."""
     assert to_http_url(signalling) == management

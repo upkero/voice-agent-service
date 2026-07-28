@@ -6,14 +6,17 @@ booking tool before the guest agreed.
 """
 
 from datetime import timedelta
+from typing import Any
 
 import pytest
 
+from src.app.core.settings.agent import AgentSettings
 from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.phrases import phrase
+from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import TOOL_SCHEMAS, BookingTools
-from tests.fakes import TOMORROW, UnavailableBookingGateway
+from tests.fakes import TOMORROW, FakeBookingGateway, UnavailableBookingGateway
 
 VALID_AVAILABILITY = {"booking_date": TOMORROW.isoformat(), "party_size": 4, "preferred_time": "19:00"}
 
@@ -34,7 +37,9 @@ async def _offer(tools: BookingTools) -> None:
         ({**VALID_AVAILABILITY, "party_size": "four"}, "a party size as a word"),
     ],
 )
-async def test_bad_availability_arguments_are_refused(tools, repository, payload, why) -> None:
+async def test_bad_availability_arguments_are_refused(
+    tools: BookingTools, repository: FakeBookingGateway, payload: dict[str, Any], why: str
+) -> None:
     result = await tools.check_availability(payload)
 
     assert result["ok"] is False, why
@@ -43,21 +48,27 @@ async def test_bad_availability_arguments_are_refused(tools, repository, payload
     assert repository.calls == []
 
 
-async def test_a_party_larger_than_the_venue_takes_goes_to_a_human(tools, repository) -> None:
+async def test_a_party_larger_than_the_venue_takes_goes_to_a_human(
+    tools: BookingTools, repository: FakeBookingGateway
+) -> None:
     result = await tools.check_availability({**VALID_AVAILABILITY, "party_size": 40})
 
     assert result["reason"] == "party_too_large"
     assert repository.calls == []
 
 
-async def test_a_date_beyond_the_horizon_is_refused_locally(tools, repository) -> None:
+async def test_a_date_beyond_the_horizon_is_refused_locally(
+    tools: BookingTools, repository: FakeBookingGateway
+) -> None:
     result = await tools.check_availability({**VALID_AVAILABILITY, "booking_date": "2027-06-01"})
 
     assert result["reason"] == "date_too_far"
     assert repository.calls == []
 
 
-async def test_booking_without_agreement_never_reaches_the_repository(tools, repository) -> None:
+async def test_booking_without_agreement_never_reaches_the_repository(
+    tools: BookingTools, repository: FakeBookingGateway
+) -> None:
     """The gate that stops a misheard 'yes' from taking a table."""
     await _offer(tools)
 
@@ -69,7 +80,9 @@ async def test_booking_without_agreement_never_reaches_the_repository(tools, rep
     assert "create_booking" not in repository.calls
 
 
-async def test_cancelling_without_agreement_never_reaches_the_repository(tools, repository) -> None:
+async def test_cancelling_without_agreement_never_reaches_the_repository(
+    tools: BookingTools, repository: FakeBookingGateway
+) -> None:
     await _offer(tools)
     await tools.create_booking({"slot_ref": "slot_1", "guest_name": "Ivanov", "party_size": 4, "confirmed": True})
 
@@ -79,7 +92,7 @@ async def test_cancelling_without_agreement_never_reaches_the_repository(tools, 
     assert "cancel_booking" not in repository.calls
 
 
-async def test_an_invented_slot_reference_is_refused(tools, repository) -> None:
+async def test_an_invented_slot_reference_is_refused(tools: BookingTools, repository: FakeBookingGateway) -> None:
     await _offer(tools)
 
     result = await tools.create_booking(
@@ -90,7 +103,9 @@ async def test_an_invented_slot_reference_is_refused(tools, repository) -> None:
     assert "create_booking" not in repository.calls
 
 
-async def test_a_malformed_reference_fails_the_schema_not_the_lookup(tools, repository) -> None:
+async def test_a_malformed_reference_fails_the_schema_not_the_lookup(
+    tools: BookingTools, repository: FakeBookingGateway
+) -> None:
     await _offer(tools)
 
     result = await tools.create_booking(
@@ -101,7 +116,7 @@ async def test_a_malformed_reference_fails_the_schema_not_the_lookup(tools, repo
     assert "create_booking" not in repository.calls
 
 
-async def test_a_blank_guest_name_is_refused(tools) -> None:
+async def test_a_blank_guest_name_is_refused(tools: BookingTools) -> None:
     await _offer(tools)
 
     result = await tools.create_booking({"slot_ref": "slot_1", "guest_name": "", "party_size": 4, "confirmed": True})
@@ -109,7 +124,9 @@ async def test_a_blank_guest_name_is_refused(tools) -> None:
     assert result["reason"] == "invalid_arguments"
 
 
-async def test_an_outage_becomes_a_sentence_rather_than_an_exception(agent_settings, state) -> None:
+async def test_an_outage_becomes_a_sentence_rather_than_an_exception(
+    agent_settings: AgentSettings, state: DialogSessionState
+) -> None:
     """A tool that raises is dead air, and dead air reads as a dropped call."""
     # Inject the fixed clock like the shared `tools` fixture, so TOMORROW stays
     # a future date whatever the real calendar says when the suite runs.
@@ -127,7 +144,7 @@ async def test_an_outage_becomes_a_sentence_rather_than_an_exception(agent_setti
     assert result["say"] == phrase("en", "core_unavailable")
 
 
-async def test_no_free_tables_is_a_success_with_an_explanation(tools) -> None:
+async def test_no_free_tables_is_a_success_with_an_explanation(tools: BookingTools) -> None:
     """A day inside the booking horizon that simply holds no free tables.
 
     Distinct from a refusal: there is nothing wrong with the request, so the

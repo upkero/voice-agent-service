@@ -9,11 +9,14 @@ from datetime import time
 import pytest
 
 from src.app.exceptions.booking import BookingNotFoundError
+from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
-from tests.fakes import TOMORROW
+from tests.fakes import TOMORROW, FakeBookingGateway
 
 
-async def test_cancelling_puts_the_table_back_on_offer(reservations, state) -> None:
+async def test_cancelling_puts_the_table_back_on_offer(
+    reservations: ReservationService, state: DialogSessionState
+) -> None:
     offers = await reservations.find_offers(state, TOMORROW, 6, preferred_time=time(19, 30))
     booked = await reservations.reserve(state, offers[0].ref, "Ivanov", 6)
 
@@ -25,7 +28,9 @@ async def test_cancelling_puts_the_table_back_on_offer(reservations, state) -> N
     assert [offer.slot.slot_time for offer in again] == [time(19, 30)]
 
 
-async def test_cancelling_twice_is_harmless(reservations, state, repository) -> None:
+async def test_cancelling_twice_is_harmless(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     """A dropped call retries the cancellation; the caller should not have to
     tell 'I cancelled it' from 'I cancelled it twice'."""
     offers = await reservations.find_offers(state, TOMORROW, 4, preferred_time=None)
@@ -39,7 +44,9 @@ async def test_cancelling_twice_is_harmless(reservations, state, repository) -> 
     assert len(cancelled) == 1
 
 
-async def test_cancelling_an_unknown_booking_fails_clearly(reservations, state, repository) -> None:
+async def test_cancelling_an_unknown_booking_fails_clearly(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
+) -> None:
     offers = await reservations.find_offers(state, TOMORROW, 4, preferred_time=None)
     booked = await reservations.reserve(state, offers[0].ref, "Ivanov", 4)
     booking_id = state.resolve_booking(booked.ref).id
@@ -49,7 +56,9 @@ async def test_cancelling_an_unknown_booking_fails_clearly(reservations, state, 
         await reservations.cancel(state, booked.ref)
 
 
-async def test_finding_a_booking_registers_it_for_cancelling(reservations, state) -> None:
+async def test_finding_a_booking_registers_it_for_cancelling(
+    reservations: ReservationService, state: DialogSessionState
+) -> None:
     """A reservation from an earlier call becomes cancellable the moment it is
     found, without its identifier ever being spoken."""
     offers = await reservations.find_offers(state, TOMORROW, 4, preferred_time=None)
@@ -63,7 +72,9 @@ async def test_finding_a_booking_registers_it_for_cancelling(reservations, state
     assert cancelled.guest_name == "Petrova"
 
 
-async def test_a_cancelled_booking_is_not_found_again(reservations, state) -> None:
+async def test_a_cancelled_booking_is_not_found_again(
+    reservations: ReservationService, state: DialogSessionState
+) -> None:
     offers = await reservations.find_offers(state, TOMORROW, 4, preferred_time=None)
     booked = await reservations.reserve(state, offers[0].ref, "Petrova", 4)
     await reservations.cancel(state, booked.ref)
