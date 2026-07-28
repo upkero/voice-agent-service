@@ -22,7 +22,7 @@ from src.app.core.settings.livekit import get_livekit_settings
 from src.app.core.settings.logging import get_logging_settings
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import DegradationNotice
-from src.app.voice.session import build_agent, build_session, greet, start_session
+from src.app.voice.session import build_agent, build_session, greet, register_degradation_notices, start_session
 
 logger = getLogger(__name__)
 
@@ -64,6 +64,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     await ctx.connect()
     session.on("conversation_item_added", tracker.on_conversation_item)
+    register_degradation_notices(session, notice, get_agent_settings().language)
 
     await start_session(session, agent, ctx, notice)
     await greet(session, agent, notice, ctx.room)

@@ -6,11 +6,12 @@ together was built without knowing this file exists, which is the test of
 whether the layering held.
 """
 
+import asyncio
 from logging import getLogger
 from typing import Any
 
 from livekit import rtc
-from livekit.agents import Agent, AgentSession, JobContext, RoomInputOptions
+from livekit.agents import Agent, AgentSession, ErrorEvent, JobContext, RoomInputOptions, stt, tts
 from livekit.agents import vad as vad_module
 
 from src.app.bootstrap.container import ApplicationContainer
@@ -74,6 +75,44 @@ def build_session(vad: vad_module.VAD | None = None) -> AgentSession[Any]:
         preemptive_generation=True,
     )
     return session
+
+
+def register_degradation_notices(session: AgentSession[Any], notice: DegradationNotice, language: str) -> None:
+    """Tell the guest the audio is broken — but only once it really is.
+
+    Two filters, both necessary. The FallbackAdapter has already tried every
+    configured provider before an error surfaces here, so this fires when the
+    chain is exhausted rather than when one provider blinked. `recoverable` is
+    the second: livekit marks a transient failure it intends to retry, and
+    announcing "I can't hear you" on one of those is worse than saying nothing.
+
+    Registered on the session rather than on the STT/TTS objects because the
+    session is where both arrive, and because a mid-conversation voice failure
+    had no announcement at all before this — only a greeting that failed to
+    speak did.
+    """
+    # livekit calls listeners synchronously, so announcing has to be scheduled.
+    # Holding the reference keeps the task from being garbage-collected mid-flight.
+    pending: set[asyncio.Task[None]] = set()
+
+    def on_error(event: ErrorEvent) -> None:
+        if isinstance(event.error, stt.STTError):
+            kind = "stt"
+        elif isinstance(event.error, tts.TTSError):
+            kind = "tts"
+        else:
+            # An LLM or realtime-model error. Not an audio failure, and the
+            # dialogue layer already turns those into something Мила can say.
+            return
+
+        if event.error.recoverable:
+            return
+
+        task = asyncio.create_task(notice.announce_once(kind, degradation_message(language, kind)))
+        pending.add(task)
+        task.add_done_callback(pending.discard)
+
+    session.on("error", on_error)
 
 
 async def start_session(

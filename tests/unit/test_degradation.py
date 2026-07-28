@@ -4,12 +4,19 @@ Anything except silence. A caller who hears nothing cannot tell a broken speech
 engine from a dropped line, and hangs up either way.
 """
 
+import asyncio
+import time
+from collections.abc import Callable
+from typing import Any, cast
 from uuid import uuid4
+
+from livekit.agents import AgentSession, ErrorEvent, stt, tts
 
 from src.app.contracts.booking import BookingDTO, BookingStatus
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import CHAT_TOPIC, DegradationNotice, announce, degradation_message
+from src.app.voice.session import register_degradation_notices
 from tests.fakes import FakeRoom
 
 
@@ -116,3 +123,61 @@ def test_a_user_turn_is_not_a_confirmation() -> None:
     tracker.on_conversation_item(_Event(_Item("user")))
 
     assert tracker.confirmation_spoken is False
+
+
+# --- mid-conversation audio failures ------------------------------------------
+class _FakeSession:
+    """Captures the listener instead of running a real AgentSession."""
+
+    def __init__(self) -> None:
+        self.handler: Callable[[ErrorEvent], None] | None = None
+
+    def on(self, event: str, callback: Callable[[ErrorEvent], None]) -> None:
+        assert event == "error"
+        self.handler = callback
+
+
+def _error_event(error_type: type[stt.STTError] | type[tts.TTSError], *, recoverable: bool) -> ErrorEvent:
+    error = error_type(
+        type="stt_error" if error_type is stt.STTError else "tts_error",
+        timestamp=time.time(),
+        label="provider",
+        error=Exception("provider is down"),
+        recoverable=recoverable,
+    )
+    return ErrorEvent(type="error", error=error, source=None)
+
+
+async def _fire(recoverable: bool, error_type: type[stt.STTError] | type[tts.TTSError] = stt.STTError) -> FakeRoom:
+    room = FakeRoom()
+    session = _FakeSession()
+    register_degradation_notices(cast(AgentSession[Any], session), DegradationNotice(room), "en")
+
+    assert session.handler is not None
+    session.handler(_error_event(error_type, recoverable=recoverable))
+    # The listener is synchronous and schedules the announcement; yield to it.
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    return room
+
+
+async def test_an_exhausted_stt_chain_is_announced() -> None:
+    """Every configured provider has already been tried by the time this fires."""
+    room = await _fire(recoverable=False)
+
+    assert room.published == [(CHAT_TOPIC, degradation_message("en", "stt"))]
+
+
+async def test_a_recoverable_blip_says_nothing() -> None:
+    """livekit will retry it. Announcing "I can't hear you" on the first hiccup
+    is how a working call gets talked out of being one."""
+    room = await _fire(recoverable=True)
+
+    assert room.published == []
+
+
+async def test_a_dead_voice_is_announced_mid_conversation_too() -> None:
+    """Before this handler, only a greeting that failed to speak was announced."""
+    room = await _fire(recoverable=False, error_type=tts.TTSError)
+
+    assert room.published == [(CHAT_TOPIC, degradation_message("en", "tts"))]
