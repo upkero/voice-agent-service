@@ -145,7 +145,7 @@ class CancelledReplayGateway(FakeBookingGateway):
     """Returns a cancelled booking from a create call.
 
     Represents a regressed or older ops-core-api. Nothing should ever answer a
-    create this way, which is exactly why the service asserts it does not.
+    create this way, which is exactly why the service refuses to pass it on.
     """
 
     async def create_booking(

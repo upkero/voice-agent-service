@@ -11,7 +11,7 @@ from hashlib import sha256
 from logging import getLogger
 
 from src.app.contracts.booking import BookingStatus, BookingSummary, SlotOffer
-from src.app.exceptions.booking import IdempotencyKeyConsumedError
+from src.app.exceptions.booking import IdempotencyKeyConsumedError, InactiveBookingError
 from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
 from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.services.dialog.session_state import DialogSessionState
@@ -86,7 +86,9 @@ class ReservationService:
             # a guest told "you have a table" stops looking. If what came back
             # is not an active booking, that is a bug worth an error, not a
             # sentence spoken out loud.
-            raise AssertionError(f"ops-core-api returned a {booking.status} booking for a create call: {booking.id}")
+            raise InactiveBookingError(
+                f"ops-core-api returned a {booking.status.value} booking for a create call: {booking.id}"
+            )
 
         return state.register_booking(booking, slot_date=slot.slot_date, slot_time=slot.slot_time)
 

@@ -31,6 +31,7 @@ from livekit.agents import stt
 from livekit.agents import vad as vad_module
 
 from src.app.core.settings.stt import STTProvider, STTSettings
+from src.app.exceptions.llm import LLMConfigurationError
 
 logger = getLogger(__name__)
 
@@ -82,9 +83,12 @@ def _build_one(provider: STTProvider, settings: STTSettings, language: str) -> s
         # "small" is the faster_whisper default and means nothing to Deepgram, so
         # a user who switched provider but not model still gets a valid model.
         model = settings.model if settings.model != "small" else "nova-3"
-        # Guaranteed by STTSettings validation; the assert satisfies the type
-        # checker and documents the invariant at the call site.
-        assert settings.api_key is not None
+        # STTSettings validation already refuses this combination, so reaching
+        # here means the settings were built some other way. Same class of
+        # problem as create_llm's missing key, and it gets the same typed error
+        # rather than a bare assert that vanishes under python -O.
+        if settings.api_key is None:
+            raise LLMConfigurationError("STT_API_KEY (a Deepgram key) is required when STT uses the deepgram provider.")
         logger.info("STT: Deepgram %s (streaming)", model)
         return deepgram.STT(
             model=model,

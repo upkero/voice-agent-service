@@ -9,7 +9,7 @@ from datetime import time
 
 import pytest
 
-from src.app.exceptions.booking import SlotTakenError
+from src.app.exceptions.booking import InactiveBookingError, SlotTakenError
 from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
@@ -126,7 +126,7 @@ async def test_a_cancelled_booking_is_never_reported_as_a_confirmation(state: Di
     service = ReservationService(CancelledReplayGateway(), NearestTimeRanking())
     offers = await service.find_offers(state, TOMORROW, party_size=4, preferred_time=None)
 
-    with pytest.raises(AssertionError, match="cancelled"):
+    with pytest.raises(InactiveBookingError, match="cancelled"):
         await service.reserve(state, offers[0].ref, "Ivanov", 4)
 
 

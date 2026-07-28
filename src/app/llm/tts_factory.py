@@ -19,6 +19,7 @@ from typing import Any
 from livekit.agents import tts
 
 from src.app.core.settings.tts import TTSProvider, TTSSettings
+from src.app.exceptions.llm import LLMConfigurationError
 
 logger = getLogger(__name__)
 
@@ -67,8 +68,10 @@ def _build_one(provider: TTSProvider, settings: TTSSettings, language: str) -> t
 
         # Streaming, ~90ms to first byte. sonic is Cartesia's low-latency model.
         model = settings.model if settings.model != "tts-1" else "sonic-2"
-        # Guaranteed by TTSSettings validation.
-        assert settings.api_key is not None
+        # Guaranteed by TTSSettings validation; typed rather than asserted so it
+        # survives python -O and arrives in the standard error envelope.
+        if settings.api_key is None:
+            raise LLMConfigurationError("TTS_API_KEY (a Cartesia key) is required when TTS uses the cartesia provider.")
         logger.info("TTS: Cartesia %s (streaming, %s)", model, language)
         # kwargs typed Any so the optional voice can be omitted (letting the
         # plugin's default stand) without tripping the typed constructor.

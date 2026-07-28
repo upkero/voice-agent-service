@@ -95,6 +95,20 @@ class BookingNotFoundError(BookingError):
     default_detail = "That reservation was not found."
 
 
+class InactiveBookingError(BookingError):
+    """A create call came back with something other than an active booking.
+
+    An external system broke an invariant this service relies on, which is why
+    it is a typed exception rather than an assert: it leaves through the normal
+    envelope, it is logged with a code, and it survives `python -O`. The guest
+    hears the generic booking apology, because the one thing that must never
+    happen is Мила saying "you have a table" when the diary does not agree.
+    """
+
+    error_code = "inactive_booking"
+    default_detail = "The booking service returned a booking that is not active."
+
+
 class UnknownReferenceError(BookingError):
     """The model used a slot or booking reference this session never issued.
 
