@@ -86,13 +86,20 @@ class TTSSettings(BaseSettings):
             raise ValueError("TTS_API_KEY (a Cartesia key) is required when TTS uses the cartesia provider.")
         return self
 
-    def resolve_voice(self, language: str) -> str:
+    def resolve_voice(self, language: str, *, as_fallback: bool = False) -> str:
         """Explicit voice wins; otherwise the language decides.
 
         The default map holds piper voice names; a cloud provider needs its own
         voice set via TTS_VOICE, so this only meaningfully defaults for piper.
+
+        TTS_VOICE names a voice of the *primary* provider ("Kore" is a Gemini
+        voice, not a piper file). A piper fallback behind a cloud primary must
+        therefore ignore it, or the very outage it exists for would find it
+        looking for a voice that was never installed.
         """
-        return self.voice or DEFAULT_PIPER_VOICES.get(language, DEFAULT_PIPER_VOICES["en"])
+        if self.voice and not as_fallback:
+            return self.voice
+        return DEFAULT_PIPER_VOICES.get(language, DEFAULT_PIPER_VOICES["en"])
 
 
 @lru_cache(maxsize=1)

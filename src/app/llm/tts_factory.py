@@ -34,16 +34,18 @@ def create_tts(settings: TTSSettings, language: str) -> tts.TTS[Any]:
     if settings.fallback_provider is None:
         return primary
 
-    fallback = _build_one(settings.fallback_provider, settings, language)
+    fallback = _build_one(settings.fallback_provider, settings, language, as_fallback=True)
     logger.info("TTS fallback enabled: %s -> %s", settings.provider, settings.fallback_provider)
     return tts.FallbackAdapter([primary, fallback])
 
 
-def _build_one(provider: TTSProvider, settings: TTSSettings, language: str) -> tts.TTS[Any]:
+def _build_one(
+    provider: TTSProvider, settings: TTSSettings, language: str, *, as_fallback: bool = False
+) -> tts.TTS[Any]:
     if provider == "piper":
         from src.app.llm.piper_tts_client import PiperTTSClient
 
-        voice = settings.resolve_voice(language)
+        voice = settings.resolve_voice(language, as_fallback=as_fallback)
         logger.info("TTS: piper voice %s", voice)
         return PiperTTSClient(settings, voice)
 

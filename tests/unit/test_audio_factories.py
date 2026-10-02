@@ -144,3 +144,17 @@ def test_tts_fallback_wraps() -> None:
 def test_piper_needs_no_key() -> None:
     client = create_tts(_tts(provider="piper"), "ru")  # its own fallback is dropped
     assert isinstance(client, tts.TTS)
+
+
+def test_a_cloud_voice_name_is_not_used_for_the_piper_fallback() -> None:
+    # TTS_VOICE="Kore" is the primary's (Gemini) voice. The piper fallback behind it must
+    # pick its own per language, or it would look for a voice file that was never installed.
+    settings = _tts(provider="cartesia", api_key="ct", voice="Kore")
+
+    assert settings.resolve_voice("en") == "Kore"
+    assert settings.resolve_voice("en", as_fallback=True) == "en_US-amy-medium"
+    assert settings.resolve_voice("ru", as_fallback=True) == "ru_RU-irina-medium"
+
+
+def test_an_explicit_voice_still_wins_when_piper_is_the_primary() -> None:
+    assert _tts(provider="piper", voice="ru_RU-irina-medium").resolve_voice("en") == "ru_RU-irina-medium"
