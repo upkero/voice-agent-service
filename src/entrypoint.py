@@ -21,6 +21,7 @@ from src.app.core.request_id import set_request_id
 from src.app.core.settings.agent import get_agent_settings
 from src.app.core.settings.livekit import get_livekit_settings
 from src.app.core.settings.logging import get_logging_settings
+from src.app.core.settings.stt import get_stt_settings
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import DegradationNotice
 from src.app.voice.session import build_agent, build_session, greet, register_degradation_notices, start_session
@@ -31,12 +32,19 @@ logger = getLogger(__name__)
 def prewarm(proc: JobProcess) -> None:
     """Load what every call needs, once per process.
 
-    Voice activity detection is loaded here rather than per job because it is
-    the same model for every call, and loading it on the first one costs a
-    second the guest spends listening to nothing.
+    Voice activity detection and the Whisper model are loaded here rather than per
+    job because they are the same for every call, and loading them on the first
+    one costs the guest seconds of silence.
     """
     setup_logging(get_logging_settings())
     proc.userdata["vad"] = silero.VAD.load()
+    stt_settings = get_stt_settings()
+    if "faster_whisper" in (stt_settings.provider, stt_settings.fallback_provider):
+        # Same reasoning as the VAD: the model is identical for every call, and
+        # loading it on the first utterance costs the guest ~10 s of silence.
+        from src.app.llm.faster_whisper_stt_client import load_model
+
+        load_model(stt_settings.model, stt_settings.compute_type)
     logger.info("Worker prewarmed", extra={"language": get_agent_settings().language})
 
 

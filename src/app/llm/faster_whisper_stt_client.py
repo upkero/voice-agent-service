@@ -7,6 +7,7 @@ hashing embeddings.
 """
 
 import asyncio
+from functools import lru_cache
 from logging import getLogger
 from typing import Any
 
@@ -18,6 +19,18 @@ from src.app.core.settings.stt import STTSettings
 from src.app.interfaces.llm.stt_client import STTClient
 
 logger = getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def load_model(name: str, compute_type: str) -> Any:
+    """One Whisper model per process. The worker calls this from prewarm so the
+    first call does not spend ~10 s loading it; every client then gets the cached one."""
+    # Imported here, not at module scope: ctranslate2 is a heavy import and the HTTP
+    # process must never pay for it.
+    from faster_whisper import WhisperModel
+
+    logger.info("Loading faster-whisper model %s (%s)", name, compute_type)
+    return WhisperModel(name, device="cpu", compute_type=compute_type)
 
 
 class FasterWhisperSTTClient(STTClient):
@@ -38,18 +51,8 @@ class FasterWhisperSTTClient(STTClient):
         # first utterances from loading the model twice.
         async with self._load_lock:
             if self._model is None:
-                from faster_whisper import WhisperModel
-
-                logger.info(
-                    "Loading faster-whisper model %s (%s)",
-                    self._settings.model,
-                    self._settings.compute_type,
-                )
                 self._model = await asyncio.to_thread(
-                    WhisperModel,
-                    self._settings.model,
-                    device="cpu",
-                    compute_type=self._settings.compute_type,
+                    load_model, self._settings.model, self._settings.compute_type
                 )
             return self._model
 
