@@ -15,7 +15,6 @@ from livekit.agents import Agent, AgentSession, ErrorEvent, JobContext, RoomInpu
 from livekit.agents import vad as vad_module
 
 from src.app.bootstrap.container import ApplicationContainer
-from src.app.core.settings.agent import get_agent_settings
 from src.app.core.settings.llm import get_llm_settings
 from src.app.core.settings.stt import get_stt_settings
 from src.app.core.settings.tts import get_tts_settings
@@ -37,23 +36,21 @@ def build_agent(container: ApplicationContainer, room_id: str) -> tuple[BookingA
     The state is per room and never shared: references issued to one guest must
     not resolve for another, and a process-wide table is how they would.
     """
-    agent_settings = get_agent_settings()
     state = DialogSessionState(room_id)
-    tools = BookingTools(container.reservation_service, state, agent_settings)
+    tools = BookingTools(container.reservation_service, state, container.agent_settings)
     return BookingAgent(container.dialog_flow, tools), state
 
 
-def build_session(vad: vad_module.VAD | None = None) -> AgentSession[Any]:
-    agent_settings = get_agent_settings()
+def build_session(language: str, vad: vad_module.VAD | None = None) -> AgentSession[Any]:
 
     session: AgentSession[Any] = AgentSession(
         vad=vad,
         # The VAD is handed to the STT factory too: when a fallback is configured
         # it wraps the two providers in a FallbackAdapter, which needs a VAD to
         # segment any batch member into the streaming interface.
-        stt=create_stt(get_stt_settings(), agent_settings.language, vad=vad),
+        stt=create_stt(get_stt_settings(), language, vad=vad),
         llm=create_llm(get_llm_settings()),
-        tts=create_tts(get_tts_settings(), agent_settings.language),
+        tts=create_tts(get_tts_settings(), language),
         # A guest interrupting the agent mid-sentence is normal on a phone call
         # ("no, the Friday one") — allowing it is what makes the exchange feel
         # like a conversation rather than a menu tree.
@@ -121,6 +118,7 @@ async def start_session(
     agent: Agent,
     ctx: JobContext,
     notice: DegradationNotice,
+    language: str,
 ) -> None:
     """Start the pipeline, or fail the job.
 
@@ -133,7 +131,6 @@ async def start_session(
     provider behind the FallbackAdapter, and text input on a session that did
     start.
     """
-    language = get_agent_settings().language
     try:
         await session.start(
             agent=agent,
@@ -153,14 +150,15 @@ async def start_session(
         raise
 
 
-async def greet(session: AgentSession[Any], agent: BookingAgent, notice: DegradationNotice, room: rtc.Room) -> None:
+async def greet(
+    session: AgentSession[Any], agent: BookingAgent, notice: DegradationNotice, room: rtc.Room, language: str
+) -> None:
     """Speak first.
 
     A voice agent that waits for the guest produces the silence-after-connect
     that people hang up on. If the greeting cannot be spoken, the same opening
     goes out as text — the call still starts.
     """
-    language = get_agent_settings().language
     try:
         await session.generate_reply(instructions=agent.flow.greeting())
     except Exception:

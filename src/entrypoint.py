@@ -56,7 +56,6 @@ async def entrypoint(ctx: JobContext) -> None:
     here instead would hold a worker slot for the length of every call for no
     reason.
     """
-    container = ApplicationContainer()
     room_name = ctx.room.name
     # No HTTP request wraps a job, so the ContextVar the outbound client reads
     # is empty and every call this worker makes to ops-core-api would arrive
@@ -65,10 +64,21 @@ async def entrypoint(ctx: JobContext) -> None:
     # room, so it joins the two sides of a booking without inventing an id
     # nobody can look up.
     set_request_id(f"room-{room_name}")
+
+    # The language is a property of the call, not of the process: the token the
+    # guest joined with carries it as a participant attribute. So the room has to
+    # be joined, and the guest awaited, before the pipeline (whose STT hint and
+    # TTS voice depend on it) can be built.
+    await ctx.connect()
+    participant = await ctx.wait_for_participant()
+    call_settings = get_agent_settings().for_language(participant.attributes.get("language"))
+    language = call_settings.language
+
+    container = ApplicationContainer(call_settings)
     agent, state = build_agent(container, room_name)
     notice = DegradationNotice(ctx.room)
     tracker = ConfirmationTracker(state)
-    session = build_session(vad=ctx.proc.userdata.get("vad"))
+    session = build_session(language, vad=ctx.proc.userdata.get("vad"))
 
     async def on_shutdown(reason: str = "") -> None:
         tracker.report(room_name, reason)
@@ -78,13 +88,12 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(on_shutdown)
 
-    await ctx.connect()
     session.on("conversation_item_added", tracker.on_conversation_item)
-    register_degradation_notices(session, notice, get_agent_settings().language)
+    register_degradation_notices(session, notice, language)
 
-    await start_session(session, agent, ctx, notice)
-    await greet(session, agent, notice, ctx.room)
-    logger.info("Call started", extra={"room": room_name})
+    await start_session(session, agent, ctx, notice, language)
+    await greet(session, agent, notice, ctx.room, language)
+    logger.info("Call started", extra={"room": room_name, "language": language})
 
 
 if __name__ == "__main__":

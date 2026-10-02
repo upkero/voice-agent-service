@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +45,16 @@ class AgentSettings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(env_prefix="AGENT_", env_file=".env", extra="ignore")
+
+    def for_language(self, language: str | None) -> "AgentSettings":
+        """This call's settings: the configured ones with the guest's language on top.
+
+        Anything that is not a supported language — absent, empty, a typo in a
+        hand-made token — falls back to AGENT_LANGUAGE rather than failing the call.
+        """
+        if language not in get_args(AgentLanguage) or language == self.language:
+            return self
+        return self.model_copy(update={"language": language})
 
 
 @lru_cache(maxsize=1)
