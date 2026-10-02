@@ -9,7 +9,7 @@ token signer — each pays only for what it touches, from one wiring file.
 import inspect
 from functools import cached_property
 
-from src.app.core.settings.agent import get_agent_settings
+from src.app.core.settings.agent import AgentSettings, get_agent_settings
 from src.app.core.settings.core_api import get_core_api_settings
 from src.app.core.settings.livekit import get_livekit_settings
 from src.app.gateways.core_api_booking import create_booking_gateway
@@ -24,9 +24,14 @@ from src.app.services.token.access_token_service import AccessTokenService
 
 
 class ApplicationContainer:
+    def __init__(self, agent_settings: AgentSettings | None = None) -> None:
+        # One container per call in the worker, so the guest's language lives here;
+        # the HTTP process and tests just get the configured settings.
+        self.agent_settings = agent_settings or get_agent_settings()
+
     @cached_property
     def access_token_service(self) -> AccessTokenService:
-        return AccessTokenService(get_livekit_settings())
+        return AccessTokenService(get_livekit_settings(), default_language=self.agent_settings.language)
 
     @cached_property
     def livekit_gateway(self) -> LiveKitGateway:
@@ -49,7 +54,7 @@ class ApplicationContainer:
 
     @cached_property
     def dialog_flow(self) -> RestaurantBookingFlow:
-        return RestaurantBookingFlow(get_agent_settings())
+        return RestaurantBookingFlow(self.agent_settings)
 
     async def close(self) -> None:
         """Close whatever was actually built, once each.

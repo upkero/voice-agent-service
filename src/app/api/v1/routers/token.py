@@ -11,5 +11,7 @@ async def issue_token(body: TokenRequest, service: AccessTokenServiceDep) -> Tok
     # Schema in, contract out, one service call in between. The router knows
     # nothing about JWTs, grants or LiveKit — moving to a different transport
     # would not touch the signing logic.
-    access = service.issue(participant_name=body.participant_name, room_name=body.room_name)
+    access = service.issue(
+        participant_name=body.participant_name, room_name=body.room_name, language=body.language
+    )
     return TokenResponse.from_contract(access)

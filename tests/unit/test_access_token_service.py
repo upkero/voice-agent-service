@@ -108,3 +108,19 @@ def test_the_url_is_handed_back_for_the_client_to_connect_to(service: AccessToke
 def test_the_management_url_is_derived_from_the_signalling_one(signalling: str, management: str) -> None:
     """One setting rather than two, because two eventually disagree."""
     assert to_http_url(signalling) == management
+
+
+def test_the_call_language_travels_as_a_participant_attribute(service: AccessTokenService) -> None:
+    issued = service.issue("Anna", language="en")
+
+    assert _claims(issued.token)["attributes"] == {"language": "en"}
+    assert issued.language == "en"
+
+
+def test_without_a_language_the_configured_one_is_used() -> None:
+    settings = LiveKitSettings(url="ws://x:7880", api_key="devkey", api_secret=SecretStr(SECRET), token_ttl_minutes=15)
+
+    issued = AccessTokenService(settings, default_language="ru").issue("Anna")
+
+    assert _claims(issued.token)["attributes"] == {"language": "ru"}
+    assert issued.language == "ru"

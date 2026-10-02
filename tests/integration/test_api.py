@@ -113,3 +113,17 @@ async def test_the_service_exposes_nothing_beyond_tokens_and_health(client: Asyn
     """The dialogue lives in the worker. An HTTP booking endpoint here would be
     a second, untested way to take a table."""
     assert (await client.post(path, json={})).status_code == 404
+
+
+async def test_the_token_reports_the_language_of_the_call(client: AsyncClient) -> None:
+    english = await client.post("/api/v1/token", json={"language": "en"})
+    default = await client.post("/api/v1/token", json={})
+
+    assert english.json()["language"] == "en"
+    assert default.json()["language"] in {"ru", "en"}  # whatever AGENT_LANGUAGE says
+
+
+async def test_an_unsupported_language_is_refused(client: AsyncClient) -> None:
+    response = await client.post("/api/v1/token", json={"language": "de"})
+
+    assert response.status_code == 422

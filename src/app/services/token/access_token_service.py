@@ -24,18 +24,26 @@ _PARTICIPANT_NAME_MAX = 64
 
 
 class AccessTokenService:
-    def __init__(self, settings: LiveKitSettings) -> None:
+    def __init__(self, settings: LiveKitSettings, default_language: str = "ru") -> None:
         self._settings = settings
+        self._default_language = default_language
 
-    def issue(self, participant_name: str, room_name: str | None = None) -> AccessTokenDTO:
+    def issue(
+        self, participant_name: str, room_name: str | None = None, language: str | None = None
+    ) -> AccessTokenDTO:
         room = self._resolve_room_name(room_name)
         identity = self._resolve_identity(participant_name)
+        call_language = language or self._default_language
         expires_at = datetime.now(UTC) + timedelta(minutes=self._settings.token_ttl_minutes)
 
         token = (
             api.AccessToken(self._settings.api_key, self._settings.api_secret.get_secret_value())
             .with_identity(identity)
             .with_name(participant_name.strip() or identity)
+            # How the agent worker learns the language of this call: it reads the
+            # attribute off the participant once they join. Not a secret and not
+            # authority — an unknown value just falls back to the configured one.
+            .with_attributes({"language": call_language})
             .with_ttl(timedelta(minutes=self._settings.token_ttl_minutes))
             .with_grants(
                 api.VideoGrants(
@@ -60,6 +68,7 @@ class AccessTokenService:
             participant_name=identity,
             livekit_url=self._settings.url,
             expires_at=expires_at,
+            language=call_language,
         )
 
     @staticmethod

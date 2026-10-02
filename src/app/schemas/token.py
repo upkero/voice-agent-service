@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from src.app.contracts.token import AccessTokenDTO
+from src.app.core.settings.agent import AgentLanguage
 
 
 class TokenRequest(BaseModel):
@@ -16,6 +17,10 @@ class TokenRequest(BaseModel):
         max_length=64,
         description="Room to join. Omit to have a fresh private room generated.",
     )
+    language: AgentLanguage | None = Field(
+        default=None,
+        description="Language of this call. Omit to use the service's AGENT_LANGUAGE.",
+    )
 
 
 class TokenResponse(BaseModel):
@@ -24,6 +29,7 @@ class TokenResponse(BaseModel):
     participant_name: str
     livekit_url: str
     expires_at: datetime
+    language: AgentLanguage
 
     @classmethod
     def from_contract(cls, access: AccessTokenDTO) -> "TokenResponse":
@@ -35,4 +41,5 @@ class TokenResponse(BaseModel):
             participant_name=access.participant_name,
             livekit_url=access.livekit_url,
             expires_at=access.expires_at,
+            language=access.language,  # type: ignore[arg-type]
         )

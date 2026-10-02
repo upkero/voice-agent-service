@@ -9,3 +9,4 @@ class AccessTokenDTO:
     participant_name: str
     livekit_url: str
     expires_at: datetime
+    language: str
