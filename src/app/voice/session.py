@@ -11,7 +11,7 @@ from logging import getLogger
 from typing import Any
 
 from livekit import rtc
-from livekit.agents import Agent, AgentSession, ErrorEvent, JobContext, RoomInputOptions, stt, tts
+from livekit.agents import Agent, AgentSession, ErrorEvent, JobContext, room_io, stt, tts
 from livekit.agents import vad as vad_module
 
 from src.app.bootstrap.container import ApplicationContainer
@@ -52,26 +52,28 @@ def build_session(language: str, vad: vad_module.VAD | None = None) -> AgentSess
         stt=create_stt(get_stt_settings(), language, vad=vad),
         llm=create_llm(get_llm_settings()),
         tts=create_tts(get_tts_settings(), language),
-        # A guest interrupting the agent mid-sentence is normal on a phone call
-        # ("no, the Friday one") — allowing it is what makes the exchange feel
-        # like a conversation rather than a menu tree.
-        allow_interruptions=True,
         # Two tool steps per turn: check availability, then answer. Booking is a
         # separate turn by design, because the guest has to agree in between.
         max_tool_steps=2,
-        # Endpointing is the single largest slice of perceived latency, and none
-        # of it is provider time. After the guest stops talking the session waits
-        # to be sure they are done; the turn-detection model is least sure
-        # exactly when a booking utterance ends — on a date or a number
-        # ("...for the 24th") — so it sits out the whole max delay. A restaurant
-        # booking is short and turn-based, so we cap that wait hard rather than
-        # leave the six-second default in place.
-        min_endpointing_delay=0.4,
-        max_endpointing_delay=2.0,
-        # Start drafting the reply (and any tool call) while the final transcript
-        # is still settling, instead of after. Overlaps the LLM with the tail of
-        # STT, which is free latency back on a sequential cloud pipeline.
-        preemptive_generation=True,
+        turn_handling={
+            # A guest interrupting the agent mid-sentence is normal on a phone
+            # call ("no, the Friday one") — allowing it is what makes the
+            # exchange feel like a conversation rather than a menu tree.
+            "interruption": {"enabled": True},
+            # Endpointing is the single largest slice of perceived latency, and
+            # none of it is provider time. After the guest stops talking the
+            # session waits to be sure they are done; the turn-detection model is
+            # least sure exactly when a booking utterance ends — on a date or a
+            # number ("...for the 24th") — so it sits out the whole max delay. A
+            # restaurant booking is short and turn-based, so we cap that wait
+            # hard rather than leave the default in place.
+            "endpointing": {"min_delay": 0.4, "max_delay": 2.0},
+            # Start drafting the reply (and any tool call) while the final
+            # transcript is still settling, instead of after. Overlaps the LLM
+            # with the tail of STT, which is free latency back on a sequential
+            # cloud pipeline.
+            "preemptive_generation": {"enabled": True},
+        },
     )
     return session
 
@@ -136,13 +138,13 @@ async def start_session(
         await session.start(
             agent=agent,
             room=ctx.room,
-            room_input_options=RoomInputOptions(
+            room_options=room_io.RoomOptions(
                 # Text input is not only a fallback. It is what makes the
                 # degraded path an actual conversation: typed messages enter the
                 # same LLM and the same tools, so a guest with no working
                 # microphone can still book a table.
-                text_enabled=True,
-                audio_enabled=True,
+                text_input=True,
+                audio_input=True,
             ),
         )
     except Exception:
