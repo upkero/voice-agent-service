@@ -53,7 +53,7 @@ services:
     # against the WhisperLive release you run.
     image: ${WHISPERLIVE_IMAGE:-ghcr.io/collabora/whisperlive-cpu:latest}
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     # GPU (uncomment with the -gpu image):
     # deploy:
     #   resources:
