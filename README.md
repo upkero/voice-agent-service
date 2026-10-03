@@ -216,7 +216,7 @@ and it is checkable.
 
 | Failure | What the guest gets |
 |---|---|
-| ops-core-api down / 5xx | A spoken sentence ("I can't reach the diary right now — shall I take your number?"). No exception reaches the pipeline. |
+| ops-core-api down / 5xx | A spoken sentence ("I can't reach the diary right now — please try again in a few minutes or call the restaurant directly"). No callback is promised: nothing here could store a number. No exception reaches the pipeline. |
 | TTS provider fails | The reply text is published to the room's data channel and the problem is announced once. The session stays up. |
 | STT provider fails | Мила says she cannot hear (TTS still works); text input stays enabled, so the same LLM + tools loop works by typing. |
 | The session itself fails to start | The job fails and the room closes. One last sentence goes out over the data channel first, but there is no text fallback here: `text_enabled` is an option *of* the session, so a session that never started cannot receive typed messages either. |
@@ -451,7 +451,7 @@ docker compose --profile selfhost-stt up   # WhisperLive на ws://whisper:9090
 
 | Отказ | Что получает гость |
 |---|---|
-| ops-core-api недоступен / 5xx | Произнесённая фраза («не могу заглянуть в журнал — записать ваш номер?»). В пайплайн исключение не уходит. |
+| ops-core-api недоступен / 5xx | Произнесённая фраза («не могу заглянуть в журнал — попробуйте через несколько минут или позвоните администратору»). Обратный звонок не обещается: номер записать некуда. В пайплайн исключение не уходит. |
 | Отказал TTS | Текст ответа уходит в data-канал комнаты, о проблеме сообщается один раз. Сессия жива. |
 | Отказал STT | Мила говорит, что не слышит (TTS ещё работает); текстовый ввод включён, так что тот же цикл LLM + инструментов работает набором с клавиатуры. |
 | Не поднялась сама сессия | Джоб падает, комната закрывается. Последняя фраза успевает уйти в data-канал, но текстового запасного пути здесь нет: `text_enabled` — параметр *сессии*, и сессия, которая не стартовала, не примет и текст. |

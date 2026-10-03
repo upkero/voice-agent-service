@@ -174,3 +174,13 @@ async def test_every_failure_reason_has_a_phrase_in_both_languages() -> None:
 
     assert set(ERROR_PHRASES["ru"]) == set(ERROR_PHRASES["en"])
     assert all(text.strip() for table in ERROR_PHRASES.values() for text in table.values())
+
+
+async def test_no_phrase_promises_a_callback_nothing_can_make() -> None:
+    """There is no tool that stores a phone number, so offering to take one is a lie."""
+    from src.app.messages import ERROR_PHRASES
+
+    promises = ("your number", "call you back", "ваш номер", "перезвоним")
+    for table in ERROR_PHRASES.values():
+        for code, text in table.items():
+            assert not any(promise in text.lower() for promise in promises), code

@@ -31,7 +31,7 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
     "ru": {
         "core_unavailable": (
             "Не могу сейчас заглянуть в журнал бронирований — похоже, система недоступна. "
-            "Давайте я запишу ваш номер, и мы перезвоним?"
+            "Сейчас забронировать не получится: попробуйте через несколько минут или позвоните администратору."
         ),
         "core_rate_limited": "Журнал бронирований сейчас перегружен. Секунду, попробую ещё раз.",
         "slot_unavailable": "Извините, этот столик только что заняли. Посмотрю, что есть рядом по времени.",
@@ -49,7 +49,7 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
     "en": {
         "core_unavailable": (
             "I can't reach the reservations diary right now — the system seems to be down. "
-            "Shall I take your number and call you back?"
+            "I can't book anything at the moment: please try again in a few minutes or call the restaurant directly."
         ),
         "core_rate_limited": "The reservations diary is busy at the moment. One second, let me try again.",
         "slot_unavailable": "Sorry, that table has just been taken. Let me see what's free around that time.",
