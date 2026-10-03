@@ -71,7 +71,10 @@ services:
       # ops-core-api runs from its own compose file. host.docker.internal is the
       # host as seen from a container on Docker Desktop; on plain Linux add
       # `extra_hosts: ["host.docker.internal:host-gateway"]` or join its network.
-      OPS_CORE_BASE_URL: ${OPS_CORE_BASE_URL:-http://host.docker.internal:8000}
+      # Deliberately not ${OPS_CORE_BASE_URL:-...}: compose interpolates from
+      # .env, and a host-side value like http://localhost:8000 would point the
+      # worker at itself. Override with COMPOSE_OPS_CORE_BASE_URL instead.
+      OPS_CORE_BASE_URL: ${COMPOSE_OPS_CORE_BASE_URL:-http://host.docker.internal:8000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
