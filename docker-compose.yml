@@ -1,6 +1,7 @@
 services:
   livekit:
-    image: livekit/livekit-server:latest
+    # Pinned: rtc.enable_loopback_candidate in config/livekit.yaml needs >= 1.13.
+    image: livekit/livekit-server:v1.13.4
     # --dev issues the well-known devkey/secret pair and skips TLS, which is
     # what makes this stack runnable with no account anywhere. Never run it
     # this way outside a laptop: those credentials are public knowledge.

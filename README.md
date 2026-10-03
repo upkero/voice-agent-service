@@ -285,14 +285,21 @@ concurrency limits; no `openai_compatible` LLM streaming tuning beyond the plugi
 ## Running on Docker Desktop (Windows / macOS)
 
 LiveKit media uses ICE, and in this topology two peers reach the server on two different networks:
-the browser on `localhost`, the agent on the `livekit` service name. `config/livekit.yaml` sets
-`use_external_ip: false` and publishes the TCP fallback port (7881), so a call connects over TCP
-even when UDP is blocked. If media still fails, run the worker on the host against the
-containerised server:
+the browser on `localhost`, the agent on the `livekit` service name. The server's own address is the
+container's IP, which the browser on the host cannot route to, so `config/livekit.yaml` also sets
+`rtc.enable_loopback_candidate: true`: LiveKit advertises `127.0.0.1` (UDP 7882 and TCP 7881) next to
+the container address, the published ports forward it, and the agent keeps using the container
+address. A blocked UDP port falls back to TCP 7881 on that same loopback candidate. If media still
+fails, run the worker on the host against the containerised server:
 
 ```bash
 uv run python -m src.entrypoint dev   # reads .env; set LIVEKIT_URL=ws://localhost:7880
 ```
+
+**This setup is local only.** For a deployment that real browsers reach over the internet you
+need a public `wss://` URL (TLS in front of 7880, returned to browsers via `PUBLIC_LIVEKIT_URL`),
+the server's public IP or TURN instead of the loopback candidate, and your own LiveKit key pair
+instead of `--dev`.
 
 ---
 
@@ -433,6 +440,15 @@ docker compose --profile selfhost-stt up   # WhisperLive на ws://whisper:9090
 Про STT и TTS сказано «отказал» в точном смысле: сообщение уходит, только когда `FallbackAdapter`
 перебрал всех настроенных провайдеров и livekit пометил ошибку как невосстановимую. На первом
 транзиентном сбое Мила молчит и продолжает работать.
+
+## Docker Desktop и прод
+
+Браузер на хосте не может достучаться до IP контейнера, поэтому `config/livekit.yaml` включает
+`rtc.enable_loopback_candidate: true`: LiveKit объявляет ещё и `127.0.0.1` (UDP 7882 и TCP 7881), а агент
+внутри compose продолжает ходить на адрес контейнера. Если UDP закрыт, звонок идёт по TCP 7881 через тот
+же loopback. **Это только для локального запуска:** для прода нужен публичный `wss://` (TLS перед 7880,
+отдаётся браузеру через `PUBLIC_LIVEKIT_URL`), публичный IP сервера или TURN и своя пара ключей LiveKit
+вместо `--dev`.
 
 ## Тесты
 
