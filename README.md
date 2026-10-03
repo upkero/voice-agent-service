@@ -80,6 +80,11 @@ That brings up three containers:
 | `voice-api` | 8080 | Token + health HTTP server |
 | `voice-agent` | — | The voice worker; registers with LiveKit and waits for a call |
 
+All ports are published on `127.0.0.1` only. That is deliberate: `--dev` uses the publicly known
+`devkey`/`secret` pair, and anyone who can reach port 7880 can sign their own LiveKit token with it
+(admin rights included) and join or record any call. Keep it that way; never expose this stack on a
+shared network with the dev keys.
+
 The agent image bakes in the piper binary, both voices and the Whisper model at build time, so a
 cold start pulls nothing.
 
@@ -363,6 +368,10 @@ docker compose up --build
 токены и health) и `voice-agent` (голосовой воркер, регистрируется в LiveKit и ждёт звонка). Образ агента
 на этапе сборки вшивает бинарь piper, оба голоса и модель Whisper, поэтому холодный старт ничего не
 качает.
+
+Все порты опубликованы только на `127.0.0.1`, и это намеренно: `--dev` использует общеизвестную пару
+`devkey`/`secret`, и любой, кто достучится до 7880, подпишет себе токен LiveKit (вплоть до админского) и
+подключится к любому звонку. Только для локального запуска; в общей сети с dev-ключами стек не открывать.
 
 **Дополнительно нужны LLM и бэкенд бронирований:**
 

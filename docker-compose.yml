@@ -3,15 +3,17 @@ services:
     # Pinned: rtc.enable_loopback_candidate in config/livekit.yaml needs >= 1.13.
     image: livekit/livekit-server:v1.13.4
     # --dev issues the well-known devkey/secret pair and skips TLS, which is
-    # what makes this stack runnable with no account anywhere. Never run it
-    # this way outside a laptop: those credentials are public knowledge.
+    # what makes this stack runnable with no account anywhere. Those
+    # credentials are public knowledge: anyone who reaches 7880 can sign an
+    # admin token with them. Hence every port below is published on loopback
+    # only — a laptop on public Wi-Fi is "outside a laptop" too.
     command: --config /etc/livekit.yaml --dev
     volumes:
       - ./config/livekit.yaml:/etc/livekit.yaml:ro
     ports:
-      - "7880:7880"      # signalling (WebSocket) and the management API
-      - "7881:7881"      # ICE over TCP, the fallback when UDP is blocked
-      - "7882:7882/udp"  # ICE over UDP, the normal media path
+      - "127.0.0.1:7880:7880"      # signalling (WebSocket) and the management API
+      - "127.0.0.1:7881:7881"      # ICE over TCP, the fallback when UDP is blocked
+      - "127.0.0.1:7882:7882/udp"  # ICE over UDP, the normal media path
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:7880"]
       interval: 5s
@@ -34,7 +36,7 @@ services:
       livekit:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
 
   # Self-hosted streaming STT, opt-in. `docker compose up` stays light; add it
   # with `docker compose --profile selfhost-stt up`. The agent reaches it by URL
