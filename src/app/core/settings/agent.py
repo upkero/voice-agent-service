@@ -49,6 +49,12 @@ class AgentSettings(BaseSettings):
         le=365,
         description="How far ahead a table may be booked.",
     )
+    tool_wait_seconds: float = Field(
+        default=8.0,
+        gt=0,
+        le=30,
+        description="Longest a guest waits on one booking tool, retries included, before hearing it is unavailable.",
+    )
 
     model_config = SettingsConfigDict(env_prefix="AGENT_", env_file=".env", extra="ignore")
 

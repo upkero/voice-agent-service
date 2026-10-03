@@ -17,6 +17,7 @@ from typing import Any
 
 from livekit.agents import Agent, RunContext, function_tool
 
+from src.app.messages import filler_line
 from src.app.services.dialog.flow import BaseDialogFlow
 from src.app.services.dialog.tools import (
     CANCEL_BOOKING_SCHEMA,
@@ -37,18 +38,28 @@ class BookingAgent(Agent):
     def flow(self) -> BaseDialogFlow:
         return self._flow
 
+    def _hold_the_line(self, ctx: RunContext[Any]) -> None:
+        # Not awaited: the tool runs while the filler plays, so a slow ops-core
+        # costs the guest no extra time, only no longer silence. Kept out of the
+        # chat context so the model never treats it as something it said.
+        ctx.session.say(filler_line(self._booking_tools.language), add_to_chat_ctx=False)
+
     @function_tool(raw_schema=CHECK_AVAILABILITY_SCHEMA)
     async def check_availability(self, ctx: RunContext[Any], raw_arguments: dict[str, Any]) -> dict[str, Any]:
+        self._hold_the_line(ctx)
         return await self._booking_tools.check_availability(raw_arguments)
 
     @function_tool(raw_schema=CREATE_BOOKING_SCHEMA)
     async def create_booking(self, ctx: RunContext[Any], raw_arguments: dict[str, Any]) -> dict[str, Any]:
+        self._hold_the_line(ctx)
         return await self._booking_tools.create_booking(raw_arguments)
 
     @function_tool(raw_schema=FIND_BOOKING_SCHEMA)
     async def find_booking(self, ctx: RunContext[Any], raw_arguments: dict[str, Any]) -> dict[str, Any]:
+        self._hold_the_line(ctx)
         return await self._booking_tools.find_booking(raw_arguments)
 
     @function_tool(raw_schema=CANCEL_BOOKING_SCHEMA)
     async def cancel_booking(self, ctx: RunContext[Any], raw_arguments: dict[str, Any]) -> dict[str, Any]:
+        self._hold_the_line(ctx)
         return await self._booking_tools.cancel_booking(raw_arguments)

@@ -19,6 +19,7 @@ never raises into the pipeline: an exception there is silence on a phone call,
 which a guest reads as the line having dropped.
 """
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import date, time, timedelta
 from logging import getLogger
@@ -311,7 +312,18 @@ class BookingTools:
         except blocks.
         """
         try:
-            return await run()
+            # The gateway's retries alone can add up to half a minute against a
+            # hung ops-core; on a phone call that reads as a dropped line. Past
+            # the ceiling the guest hears the outage sentence instead.
+            async with asyncio.timeout(self._settings.tool_wait_seconds):
+                return await run()
+        except TimeoutError:
+            logger.warning(
+                "Tool call exceeded %.1f s",
+                self._settings.tool_wait_seconds,
+                extra={"room_id": self._state.room_id, "error_code": "core_unavailable"},
+            )
+            return self._failure("core_unavailable")
         except BookingError as exc:
             logger.warning(
                 "Tool call failed: %s",

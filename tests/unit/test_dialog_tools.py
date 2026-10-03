@@ -5,11 +5,14 @@ invent a field, drop a required one, send a party size of forty, call the
 booking tool before the guest agreed.
 """
 
-from datetime import timedelta
+import asyncio
+from collections.abc import Sequence
+from datetime import date, timedelta
 from typing import Any
 
 import pytest
 
+from src.app.contracts.booking import SlotDTO
 from src.app.core.settings.agent import AgentSettings
 from src.app.messages import phrase
 from src.app.services.booking.ranking import NearestTimeRanking
@@ -184,3 +187,32 @@ async def test_no_phrase_promises_a_callback_nothing_can_make() -> None:
     for table in ERROR_PHRASES.values():
         for code, text in table.items():
             assert not any(promise in text.lower() for promise in promises), code
+
+
+async def test_a_hanging_backend_is_cut_off_and_phrased(
+    agent_settings: AgentSettings, state: DialogSessionState
+) -> None:
+    """Retries against a hung ops-core add up to half a minute of silence; the guest gets a sentence instead."""
+
+    class HangingGateway(FakeBookingGateway):
+        async def list_available_slots(self, slot_date: date, party_size: int) -> Sequence[SlotDTO]:
+            await asyncio.sleep(60)
+            return []
+
+    tools = BookingTools(
+        ReservationService(HangingGateway(), NearestTimeRanking()),
+        state,
+        agent_settings.model_copy(update={"tool_wait_seconds": 0.05}),
+        today=lambda: TOMORROW - timedelta(days=1),
+    )
+
+    result = await asyncio.wait_for(tools.check_availability(dict(VALID_AVAILABILITY)), timeout=2)
+
+    assert result["reason"] == "core_unavailable"
+    assert result["say"] == phrase("en", "core_unavailable")
+
+
+async def test_every_language_has_a_filler_line() -> None:
+    from src.app.messages import ERROR_PHRASES, filler_line
+
+    assert all(filler_line(language).strip() for language in ERROR_PHRASES)

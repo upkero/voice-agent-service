@@ -96,6 +96,17 @@ GREETINGS: Final[dict[str, str]] = {
 }
 
 
+# Spoken the moment a booking tool starts, so the wait for ops-core is not dead air.
+FILLERS: Final[dict[str, str]] = {
+    "ru": "Секунду, проверяю.",
+    "en": "One moment, let me check.",
+}
+
+
+def filler_line(language: str) -> str:
+    return FILLERS.get(language) or FILLERS[_FALLBACK_LANGUAGE]
+
+
 def greeting_line(language: str, agent_name: str, venue_name: str) -> str:
     template = GREETINGS.get(language) or GREETINGS[_FALLBACK_LANGUAGE]
     return template.format(agent_name=agent_name, venue_name=venue_name)
