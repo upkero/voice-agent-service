@@ -58,18 +58,14 @@ async def test_a_token_can_be_issued_with_no_body_fields(client: AsyncClient) ->
     assert body["livekit_url"] == get_livekit_settings().url
 
 
-async def test_a_requested_room_is_honoured(client: AsyncClient) -> None:
-    response = await client.post("/api/v1/token", json={"participant_name": "Anna", "room_name": "table-7"})
+@pytest.mark.parametrize("requested", ["table-7", "not a room"])
+async def test_a_requested_room_is_ignored(client: AsyncClient, requested: str) -> None:
+    """The endpoint is unauthenticated: honouring a name would let anyone who
+    knows it join that call with publish and subscribe rights."""
+    response = await client.post("/api/v1/token", json={"participant_name": "Anna", "room_name": requested})
 
     assert response.status_code == 200
-    assert response.json()["room_name"] == "table-7"
-
-
-async def test_a_bad_room_name_is_a_typed_error_envelope(client: AsyncClient) -> None:
-    response = await client.post("/api/v1/token", json={"room_name": "not a room"})
-
-    assert response.status_code == 422
-    assert response.json()["error_code"] == "invalid_room_name"
+    assert response.json()["room_name"].startswith("booking-")
 
 
 async def test_an_oversized_name_is_rejected_by_the_schema(client: AsyncClient) -> None:

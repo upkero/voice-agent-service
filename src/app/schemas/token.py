@@ -12,11 +12,6 @@ class TokenRequest(BaseModel):
         max_length=64,
         description="Display name for the caller. Not an identity: the service derives a unique one.",
     )
-    room_name: str | None = Field(
-        default=None,
-        max_length=64,
-        description="Room to join. Omit to have a fresh private room generated.",
-    )
     language: AgentLanguage | None = Field(
         default=None,
         description="Language of this call. Omit to use the service's AGENT_LANGUAGE.",

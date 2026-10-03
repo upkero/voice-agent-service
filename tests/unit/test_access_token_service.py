@@ -6,7 +6,6 @@ import pytest
 from pydantic import SecretStr
 
 from src.app.core.settings.livekit import LiveKitSettings
-from src.app.exceptions.token import InvalidRoomNameError
 from src.app.gateways.livekit_probe import to_http_url
 from src.app.services.token.access_token_service import AccessTokenService
 
@@ -29,13 +28,12 @@ def _claims(token: str) -> dict[str, Any]:
     return jwt.decode(token, SECRET, algorithms=["HS256"])
 
 
-def test_the_token_grants_joining_one_named_room(service: AccessTokenService) -> None:
-    issued = service.issue("Anna", room_name="table-42")
+def test_the_token_grants_joining_its_own_room_only(service: AccessTokenService) -> None:
+    issued = service.issue("Anna")
 
     grants = _claims(issued.token)["video"]
     assert grants["roomJoin"] is True
-    assert grants["room"] == "table-42"
-    assert issued.room_name == "table-42"
+    assert grants["room"] == issued.room_name
 
 
 def test_the_token_grants_nothing_administrative(service: AccessTokenService) -> None:
@@ -53,7 +51,7 @@ def test_data_publishing_is_granted(service: AccessTokenService) -> None:
     assert _claims(service.issue("Anna").token)["video"]["canPublishData"] is True
 
 
-def test_an_omitted_room_gets_a_private_one(service: AccessTokenService) -> None:
+def test_every_token_gets_a_private_room(service: AccessTokenService) -> None:
     first = service.issue("Anna")
     second = service.issue("Boris")
 
@@ -77,12 +75,6 @@ def test_a_non_ascii_name_still_yields_a_usable_identity(service: AccessTokenSer
     # The name the guest gave survives for display, even though the identity is
     # reduced to something safe for URLs and logs.
     assert _claims(issued.token)["name"] == "Мила"
-
-
-@pytest.mark.parametrize("bad", ["has space", "semi;colon", "slash/es", "quote'", "../escape"])
-def test_hostile_room_names_are_refused(service: AccessTokenService, bad: str) -> None:
-    with pytest.raises(InvalidRoomNameError):
-        service.issue("Anna", room_name=bad)
 
 
 def test_the_token_expires(service: AccessTokenService) -> None:

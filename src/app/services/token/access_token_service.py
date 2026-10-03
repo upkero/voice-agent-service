@@ -14,12 +14,7 @@ from livekit import api
 
 from src.app.contracts.token import AccessTokenDTO
 from src.app.core.settings.livekit import LiveKitSettings
-from src.app.exceptions.token import InvalidRoomNameError
 
-# LiveKit accepts a fairly free-form room name, but anything that travels in a
-# URL and lands in logs is worth pinning down. Letters, digits, dash and
-# underscore only.
-_ROOM_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _PARTICIPANT_NAME_MAX = 64
 
 
@@ -28,10 +23,11 @@ class AccessTokenService:
         self._settings = settings
         self._default_language = default_language
 
-    def issue(
-        self, participant_name: str, room_name: str | None = None, language: str | None = None
-    ) -> AccessTokenDTO:
-        room = self._resolve_room_name(room_name)
+    def issue(self, participant_name: str, language: str | None = None) -> AccessTokenDTO:
+        # Always a fresh random room, never one the caller names: this endpoint
+        # is unauthenticated, so honouring a name would let anyone who knows or
+        # guesses it join that call with publish and subscribe rights.
+        room = f"booking-{secrets.token_urlsafe(9)}"
         identity = self._resolve_identity(participant_name)
         call_language = language or self._default_language
         expires_at = datetime.now(UTC) + timedelta(minutes=self._settings.token_ttl_minutes)
@@ -70,18 +66,6 @@ class AccessTokenService:
             expires_at=expires_at,
             language=call_language,
         )
-
-    @staticmethod
-    def _resolve_room_name(room_name: str | None) -> str:
-        if room_name is None or not room_name.strip():
-            # A random name rather than a shared default: two guests who both
-            # open the demo without naming a room should not end up in the same
-            # conversation with the same agent.
-            return f"booking-{secrets.token_urlsafe(9)}"
-        candidate = room_name.strip()
-        if not _ROOM_NAME_PATTERN.match(candidate):
-            raise InvalidRoomNameError()
-        return candidate
 
     @staticmethod
     def _resolve_identity(participant_name: str) -> str:
