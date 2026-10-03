@@ -41,5 +41,5 @@ class TokenResponse(BaseModel):
             participant_name=access.participant_name,
             livekit_url=access.livekit_url,
             expires_at=access.expires_at,
-            language=access.language,  # type: ignore[arg-type]
+            language=access.language,
         )
