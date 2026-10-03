@@ -38,8 +38,13 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         "slot_capacity_exceeded": "За этот столик столько гостей не поместится. Подберу побольше.",
         "entity_not_found": "Не нахожу брони на это имя и число. Может быть, она на другой день?",
         "not_cancellable": (
-            "Отменить по телефону я могу только бронь, сделанную в этом звонке. "
-            "Чтобы отменить эту, позвоните, пожалуйста, администратору."
+            "Чтобы отменить эту бронь, мне нужен код брони — я называла его, когда вы бронировали. "
+            "Если кода нет, позвоните, пожалуйста, администратору."
+        ),
+        "wrong_booking_code": "Этот код не подходит к брони на это имя и число. Проверьте его, пожалуйста.",
+        "booking_code_attempts_exhausted": (
+            "Код не совпал несколько раз, поэтому отменить по телефону не получится. "
+            "Позвоните, пожалуйста, администратору."
         ),
         "unknown_reference": "Кажется, я потеряла нить. Давайте уточним: на какое число и на сколько человек?",
         "booking_error": "Что-то пошло не так с бронированием. Давайте попробуем ещё раз.",
@@ -60,8 +65,13 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         "slot_capacity_exceeded": "That table won't seat your party. Let me find a bigger one.",
         "entity_not_found": "I can't find a booking under that name for that date. Might it be another day?",
         "not_cancellable": (
-            "I can only cancel a booking made during this call. "
-            "To cancel this one, please call the restaurant directly."
+            "To cancel that booking I need its booking code — I gave it to you when you booked. "
+            "If you don't have it, please call the restaurant directly."
+        ),
+        "wrong_booking_code": "That code doesn't match a booking under that name and date. Could you check it?",
+        "booking_code_attempts_exhausted": (
+            "That code didn't match a few times, so I can't cancel it by phone. "
+            "Please call the restaurant directly."
         ),
         "unknown_reference": "I've lost the thread there. Which date, and for how many people?",
         "booking_error": "Something went wrong with the booking. Let's try that again.",

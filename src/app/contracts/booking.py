@@ -61,3 +61,5 @@ class BookingSummary:
     party_size: int
     slot_date: date | None
     slot_time: time | None
+    # Spoken once, when the booking is made: what proves ownership on a later call.
+    code: str | None = None

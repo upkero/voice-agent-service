@@ -8,7 +8,12 @@ from datetime import time
 
 import pytest
 
-from src.app.exceptions.booking import BookingNotFoundError, NotCancellableError
+from src.app.exceptions.booking import (
+    BookingCodeAttemptsExhaustedError,
+    BookingNotFoundError,
+    NotCancellableError,
+    WrongBookingCodeError,
+)
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
 from tests.fakes import TOMORROW, FakeBookingGateway
@@ -86,3 +91,46 @@ async def test_a_cancelled_booking_is_not_found_again(
     found = await reservations.find_existing(state, "Petrova", TOMORROW)
 
     assert found == []
+
+
+async def _booked_on_an_earlier_call(reservations: ReservationService) -> str:
+    first_call = DialogSessionState("first-call")
+    offers = await reservations.find_offers(first_call, TOMORROW, 4, preferred_time=None)
+    booked = await reservations.reserve(first_call, offers[0].ref, "Petrova", 4)
+    assert booked.code is not None
+    return booked.code
+
+
+async def test_a_booking_comes_with_a_short_spoken_code(reservations: ReservationService) -> None:
+    code = await _booked_on_an_earlier_call(reservations)
+
+    assert len(code) == 4
+    assert code.isdigit()
+
+
+async def test_the_booking_code_lets_a_later_call_cancel(
+    reservations: ReservationService, repository: FakeBookingGateway
+) -> None:
+    code = await _booked_on_an_earlier_call(reservations)
+
+    later_call = DialogSessionState("second-call")
+    found = await reservations.find_existing(later_call, "Petrova", TOMORROW, code)
+    cancelled = await reservations.cancel(later_call, found[0].ref)
+
+    assert cancelled.guest_name == "Petrova"
+    assert all(b.status.value == "cancelled" for b in repository.bookings.values())
+
+
+async def test_a_wrong_code_is_refused_and_guessing_is_capped(reservations: ReservationService) -> None:
+    code = await _booked_on_an_earlier_call(reservations)
+    wrong = f"{(int(code) + 1) % 10000:04d}"
+    stranger = DialogSessionState("second-call")
+
+    for _ in range(3):
+        with pytest.raises(WrongBookingCodeError):
+            await reservations.find_existing(stranger, "Petrova", TOMORROW, wrong)
+
+    # Even the right code no longer works on this call: otherwise three
+    # attempts would be a speed limit, not a cap.
+    with pytest.raises(BookingCodeAttemptsExhaustedError):
+        await reservations.find_existing(stranger, "Petrova", TOMORROW, code)

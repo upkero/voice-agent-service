@@ -21,6 +21,7 @@ from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.interfaces.livekit_gateway import LiveKitGateway
 
 TOMORROW = date(2026, 7, 24)
+CODE_KEY = b"test-booking-code-key"
 
 
 def make_slot(hour: int = 19, minute: int = 30, capacity: int = 6, slot_date: date = TOMORROW) -> SlotDTO:

@@ -23,7 +23,12 @@ certainty. The static pattern rejects nothing this would have caught.
 from datetime import date, time
 
 from src.app.contracts.booking import BookingDTO, BookingSummary, SlotDTO, SlotOffer
-from src.app.exceptions.booking import NotCancellableError, UnknownReferenceError
+from src.app.exceptions.booking import BookingCodeAttemptsExhaustedError, NotCancellableError, UnknownReferenceError
+
+# NOTE: per call, so a caller who hangs up and redials gets three more guesses
+# (3 in 10,000 per call, and they need the name and date first). A cap per
+# booking would need storage in ops-core-api.
+MAX_CODE_ATTEMPTS = 3
 
 
 class DialogSessionState:
@@ -34,9 +39,10 @@ class DialogSessionState:
         self._slots: dict[str, SlotDTO] = {}
         self._bookings: dict[str, BookingDTO] = {}
         self._summaries: dict[str, BookingSummary] = {}
-        # References of bookings made during this call: the only ones a voice
-        # caller has proved they own.
-        self._made_here: set[str] = set()
+        # References of bookings the caller has proved they own: made during
+        # this call, or found with the right booking code.
+        self._cancellable: set[str] = set()
+        self._code_attempts_left = MAX_CODE_ATTEMPTS
         # Incremented on every cancellation. It is what makes the idempotency
         # key describe the current *intent* rather than a repeatable set of
         # arguments — see ReservationService.reserve for why that is required.
@@ -77,13 +83,15 @@ class DialogSessionState:
         *,
         slot_date: date | None = None,
         slot_time: time | None = None,
-        made_here: bool = True,
+        code: str | None = None,
+        cancellable: bool = True,
     ) -> BookingSummary:
         """Remember a booking so the model can refer to it.
 
-        One made during this call (`made_here`) can be cancelled later in the
-        same call without a lookup. One found by name and date can only be read
-        back: a name and a date prove nothing about who is calling.
+        A `cancellable` one (made during this call, or found with its booking
+        code) can be cancelled later in the same call without a lookup. One
+        found by name and date alone can only be read back: a name and a date
+        prove nothing about who is calling.
         """
         # A replayed booking is the same booking. Issuing it a second reference
         # would show the model two reservations where the guest has one, and
@@ -99,11 +107,12 @@ class DialogSessionState:
             party_size=booking.party_size,
             slot_date=slot_date,
             slot_time=slot_time,
+            code=code,
         )
         self._bookings[ref] = booking
         self._summaries[ref] = summary
-        if made_here:
-            self._made_here.add(ref)
+        if cancellable:
+            self._cancellable.add(ref)
         return summary
 
     def resolve_booking(self, ref: str) -> BookingDTO:
@@ -114,9 +123,15 @@ class DialogSessionState:
 
     def resolve_cancellable(self, ref: str) -> BookingDTO:
         booking = self.resolve_booking(ref)
-        if ref not in self._made_here:
-            raise NotCancellableError(f"Booking reference '{ref}' was found, not made, in this conversation.")
+        if ref not in self._cancellable:
+            raise NotCancellableError(f"Booking reference '{ref}' was found without its booking code.")
         return booking
+
+    def spend_code_attempt(self) -> None:
+        """Count a booking-code check; refuse once this call has used them all."""
+        if self._code_attempts_left <= 0:
+            raise BookingCodeAttemptsExhaustedError()
+        self._code_attempts_left -= 1
 
     def summarise_booking(self, ref: str) -> BookingSummary:
         summary = self._summaries.get(ref)

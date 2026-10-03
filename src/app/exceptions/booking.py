@@ -110,16 +110,29 @@ class InactiveBookingError(BookingError):
 
 
 class NotCancellableError(BookingError):
-    """The booking was found by name and date, not made during this call.
+    """The booking was found by name and date alone.
 
     A name and a date are guessable, so they do not prove the caller owns the
-    booking. Cancelling by voice is limited to what this call booked; anything
-    else goes to a person.
+    booking. Cancelling needs the booking code the guest was told when booking.
     """
 
     status_code = 403
     error_code = "not_cancellable"
-    default_detail = "Only a booking made during this call can be cancelled."
+    default_detail = "Cancelling a booking from an earlier call needs its booking code."
+
+
+class WrongBookingCodeError(BookingError):
+    status_code = 403
+    error_code = "wrong_booking_code"
+    default_detail = "That booking code does not match a booking under that name and date."
+
+
+class BookingCodeAttemptsExhaustedError(BookingError):
+    """Too many wrong codes on one call: further guesses are not checked."""
+
+    status_code = 403
+    error_code = "booking_code_attempts_exhausted"
+    default_detail = "Too many wrong booking codes on this call."
 
 
 class UnknownReferenceError(BookingError):

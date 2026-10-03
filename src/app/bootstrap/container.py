@@ -50,7 +50,10 @@ class ApplicationContainer:
 
     @cached_property
     def reservation_service(self) -> ReservationService:
-        return ReservationService(self.booking_gateway, self.slot_ranking)
+        # The ops-core key doubles as the booking-code key: whoever holds it can
+        # cancel through ops-core directly, so it grants nothing new.
+        code_key = get_core_api_settings().api_key.get_secret_value().encode()
+        return ReservationService(self.booking_gateway, self.slot_ranking, code_key)
 
     @cached_property
     def dialog_flow(self) -> RestaurantBookingFlow:

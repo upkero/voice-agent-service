@@ -19,7 +19,7 @@ from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import TOOL_SCHEMAS, BookingTools
-from tests.fakes import TOMORROW, FakeBookingGateway, UnavailableBookingGateway
+from tests.fakes import CODE_KEY, TOMORROW, FakeBookingGateway, UnavailableBookingGateway
 
 VALID_AVAILABILITY = {"booking_date": TOMORROW.isoformat(), "party_size": 4, "preferred_time": "19:00"}
 
@@ -134,7 +134,7 @@ async def test_an_outage_becomes_a_sentence_rather_than_an_exception(
     # Inject the fixed clock like the shared `tools` fixture, so TOMORROW stays
     # a future date whatever the real calendar says when the suite runs.
     tools = BookingTools(
-        ReservationService(UnavailableBookingGateway(), NearestTimeRanking()),
+        ReservationService(UnavailableBookingGateway(), NearestTimeRanking(), CODE_KEY),
         state,
         agent_settings,
         today=lambda: TOMORROW - timedelta(days=1),
@@ -200,7 +200,7 @@ async def test_a_hanging_backend_is_cut_off_and_phrased(
             return []
 
     tools = BookingTools(
-        ReservationService(HangingGateway(), NearestTimeRanking()),
+        ReservationService(HangingGateway(), NearestTimeRanking(), CODE_KEY),
         state,
         agent_settings.model_copy(update={"tool_wait_seconds": 0.05}),
         today=lambda: TOMORROW - timedelta(days=1),
@@ -216,3 +216,24 @@ async def test_every_language_has_a_filler_line() -> None:
     from src.app.messages import ERROR_PHRASES, filler_line
 
     assert all(filler_line(language).strip() for language in ERROR_PHRASES)
+
+
+async def test_the_booking_code_round_trips_through_the_tools(
+    tools: BookingTools, reservations: ReservationService, agent_settings: AgentSettings
+) -> None:
+    """What the model hears at booking time is exactly what opens the booking on a later call."""
+    await _offer(tools)
+    made = await tools.create_booking(
+        {"slot_ref": "slot_1", "guest_name": "Ivanov", "party_size": 4, "confirmed": True}
+    )
+    code = made["booking"]["booking_code"]
+
+    later = BookingTools(
+        reservations, DialogSessionState("later-call"), agent_settings, today=lambda: TOMORROW - timedelta(days=1)
+    )
+    found = await later.find_booking(
+        {"guest_name": "Ivanov", "booking_date": TOMORROW.isoformat(), "booking_code": code}
+    )
+    cancelled = await later.cancel_booking({"booking_ref": found["bookings"][0]["ref"], "confirmed": True})
+
+    assert cancelled["ok"] is True

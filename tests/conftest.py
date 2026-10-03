@@ -23,7 +23,7 @@ from src.app.services.booking.reservation_service import ReservationService  # n
 from src.app.services.dialog.session_state import DialogSessionState  # noqa: E402
 from src.app.services.dialog.tools import BookingTools  # noqa: E402
 from src.main import create_app  # noqa: E402
-from tests.fakes import FakeBookingGateway  # noqa: E402
+from tests.fakes import CODE_KEY, FakeBookingGateway  # noqa: E402
 
 TODAY = date(2026, 7, 23)
 
@@ -53,7 +53,7 @@ def state() -> DialogSessionState:
 
 @pytest.fixture
 def reservations(repository: FakeBookingGateway) -> ReservationService:
-    return ReservationService(repository, NearestTimeRanking())
+    return ReservationService(repository, NearestTimeRanking(), CODE_KEY)
 
 
 @pytest.fixture

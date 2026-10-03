@@ -26,7 +26,7 @@ leave the machine.
 |---|---|
 | Voice pipeline | LiveKit WebRTC transport, Silero VAD, STT → LLM → TTS via `AgentSession`. |
 | Deterministic tools | Four function tools with explicit JSON Schema + Pydantic validation before dispatch, so a mishearing cannot take a table. |
-| Booking | Checks availability, offers the nearest real slots, books, finds and cancels — all against ops-core-api over HTTP. Only a booking made during the same call can be cancelled. |
+| Booking | Checks availability, offers the nearest real slots, books, finds and cancels — all against ops-core-api over HTTP. An earlier booking is cancelled with the four-digit code given when it was made. |
 | Bilingual | The language is chosen per call (`language` in the token request); `AGENT_LANGUAGE=ru\|en` is only the default. It switches the Whisper hint, the piper voice, the persona and a fixed, pre-synthesised greeting. |
 | Graceful degradation | ops-core-api down, or an exhausted STT/TTS fallback chain, produces a spoken or data-channel explanation — never silence. |
 
@@ -240,11 +240,14 @@ real IDs. A reference the session never issued cannot resolve, so a hallucinated
 locally instead of reaching ops-core-api. A booking made during the call is cancellable by its
 reference with no second lookup.
 
-**Only this call's bookings can be cancelled.** `find_booking` finds a reservation by name and
-date and can read it back, but a name and a date are guessable and prove nothing about who is
-calling, so such a booking is not cancellable by voice — Мила sends the guest to the restaurant.
-Cancelling an older booking by phone would need a second factor (a booking code or the phone
-number it was made with) stored in ops-core-api, which it does not have yet.
+**Cancelling an earlier booking needs its booking code.** A name and a date are guessable and
+prove nothing about who is calling, so `find_booking` by name and date alone can only read a
+booking back. When a booking is made, Мила confirms it and mentions a four-digit booking code in
+passing ("…your code is 4-7-2-1, in case you need to cancel"). On a later call, name + date + code
+make it cancellable; without the code she sends the guest to the restaurant. Three wrong codes end
+code checks for that call. The code is not stored anywhere: it is an HMAC of the booking id keyed
+with `OPS_CORE_API_KEY`, so it works for every booking with no ops-core change, and rotating that
+key changes every code.
 
 **All model-facing text lives in `prompts/`.** The system prompt's five sections and every tool
 `description` are Markdown files loaded at import, in English, with the reply language as a
@@ -344,7 +347,7 @@ Web Speech API.
 |---|---|
 | Голосовой пайплайн | LiveKit WebRTC, Silero VAD, STT → LLM → TTS через `AgentSession`. |
 | Детерминированные инструменты | Четыре function-tool со строгой JSON Schema и валидацией Pydantic до вызова — ослышка не приводит к брони. |
-| Бронирование | Проверка наличия, ближайшие реальные слоты, бронь, поиск и отмена — всё через HTTP к ops-core-api. Отменить можно только бронь, сделанную в этом же звонке: имя и дата угадываются и ничего не доказывают. |
+| Бронирование | Проверка наличия, ближайшие реальные слоты, бронь, поиск и отмена — всё через HTTP к ops-core-api. При брони Мила между делом называет четырёхзначный код; бронь с прошлого звонка отменяется по имени, дате и этому коду (имя и дата угадываются и ничего не доказывают). Код нигде не хранится — это HMAC от id брони на ключе `OPS_CORE_API_KEY`; три неверных кода за звонок — и проверка кода прекращается. |
 | Двуязычность | `AGENT_LANGUAGE=ru\|en` переключает подсказку Whisper, голос piper и персону одной настройкой. |
 | Грациозная деградация | Недоступность ops-core-api или исчерпанная цепочка fallback'ов STT/TTS даёт голосовое или текстовое объяснение — не тишину. |
 

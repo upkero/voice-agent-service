@@ -6,7 +6,7 @@ from src.app.exceptions.booking import CoreUnavailableError
 from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import MAX_OFFERS, ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
-from tests.fakes import TOMORROW, FakeBookingGateway, UnavailableBookingGateway, make_slot, seeded_slots
+from tests.fakes import CODE_KEY, TOMORROW, FakeBookingGateway, UnavailableBookingGateway, make_slot, seeded_slots
 
 
 async def test_offers_the_nearest_times_to_the_request(
@@ -34,7 +34,7 @@ async def test_offers_exclude_tables_that_are_too_small(
 async def test_offers_are_capped(state: DialogSessionState) -> None:
     """A guest cannot hold a read-out list of six times in their head."""
     many = [make_slot(hour, 0, 6) for hour in range(12, 22)]
-    service = ReservationService(FakeBookingGateway(many), NearestTimeRanking())
+    service = ReservationService(FakeBookingGateway(many), NearestTimeRanking(), CODE_KEY)
 
     offers = await service.find_offers(state, TOMORROW, party_size=2, preferred_time=None)
 
@@ -74,7 +74,7 @@ async def test_reserving_an_unoffered_reference_never_reaches_the_repository(
 
 
 async def test_core_outage_surfaces_as_a_typed_failure(state: DialogSessionState) -> None:
-    service = ReservationService(UnavailableBookingGateway(), NearestTimeRanking())
+    service = ReservationService(UnavailableBookingGateway(), NearestTimeRanking(), CODE_KEY)
 
     with pytest.raises(CoreUnavailableError):
         await service.find_offers(state, TOMORROW, party_size=2, preferred_time=None)

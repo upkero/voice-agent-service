@@ -41,6 +41,7 @@ _DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 _TIME_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"
 _SLOT_REF_PATTERN = r"^slot_[1-9]\d*$"
 _BOOKING_REF_PATTERN = r"^booking_[1-9]\d*$"
+_BOOKING_CODE_PATTERN = r"^\d{4}$"
 
 
 def _text(name: str) -> str:
@@ -79,6 +80,7 @@ class CreateBookingArgs(_StrictArgs):
 class FindBookingArgs(_StrictArgs):
     guest_name: str = Field(min_length=1, max_length=200)
     booking_date: date
+    booking_code: str | None = Field(default=None, pattern=_BOOKING_CODE_PATTERN)
 
 
 class CancelBookingArgs(_StrictArgs):
@@ -153,8 +155,13 @@ FIND_BOOKING_SCHEMA: Final[dict[str, Any]] = {
         "properties": {
             "guest_name": {"type": "string", "minLength": 1, "maxLength": 200},
             "booking_date": {"type": "string", "pattern": _DATE_PATTERN},
+            "booking_code": {
+                "type": ["string", "null"],
+                "pattern": _BOOKING_CODE_PATTERN,
+                "description": _text("tool_find_booking_booking_code"),
+            },
         },
-        "required": ["guest_name", "booking_date"],
+        "required": ["guest_name", "booking_date", "booking_code"],
         "additionalProperties": False,
     },
 }
@@ -267,7 +274,7 @@ class BookingTools:
 
         async def run() -> dict[str, Any]:
             summaries = await self._reservations.find_existing(
-                self._state, args.guest_name.strip(), args.booking_date
+                self._state, args.guest_name.strip(), args.booking_date, args.booking_code
             )
             if not summaries:
                 return {"ok": True, "bookings": [], "say": phrase(self.language, "entity_not_found")}
@@ -375,4 +382,6 @@ class BookingTools:
             rendered["date"] = summary.slot_date.isoformat()
         if summary.slot_time is not None:
             rendered["time"] = summary.slot_time.strftime("%H:%M")
+        if summary.code is not None:
+            rendered["booking_code"] = summary.code
         return rendered

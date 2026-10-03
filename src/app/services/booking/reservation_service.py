@@ -5,13 +5,15 @@ a voice call, an HTTP request or a test, which is what makes it the layer worth
 covering with tests rather than the pipeline wiring around it.
 """
 
+import hmac
 from collections.abc import Sequence
 from datetime import date, time
 from hashlib import sha256
 from logging import getLogger
+from uuid import UUID
 
 from src.app.contracts.booking import BookingStatus, BookingSummary, SlotOffer
-from src.app.exceptions.booking import IdempotencyKeyConsumedError, InactiveBookingError
+from src.app.exceptions.booking import IdempotencyKeyConsumedError, InactiveBookingError, WrongBookingCodeError
 from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
 from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.services.dialog.session_state import DialogSessionState
@@ -25,9 +27,10 @@ MAX_OFFERS = 3
 
 
 class ReservationService:
-    def __init__(self, bookings: BookingGateway, ranking: SlotRankingStrategy) -> None:
+    def __init__(self, bookings: BookingGateway, ranking: SlotRankingStrategy, code_key: bytes) -> None:
         self._bookings = bookings
         self._ranking = ranking
+        self._code_key = code_key
 
     async def find_offers(
         self,
@@ -90,26 +93,55 @@ class ReservationService:
                 f"ops-core-api returned a {booking.status.value} booking for a create call: {booking.id}"
             )
 
-        return state.register_booking(booking, slot_date=slot.slot_date, slot_time=slot.slot_time)
+        return state.register_booking(
+            booking, slot_date=slot.slot_date, slot_time=slot.slot_time, code=self.booking_code(booking.id)
+        )
 
     async def find_existing(
         self,
         state: DialogSessionState,
         guest_name: str,
         booking_date: date,
+        code: str | None = None,
     ) -> list[BookingSummary]:
         """Active bookings under a name on a date, as speakable summaries.
+
+        Without a code they can only be read back. With the right one, the
+        matching booking becomes cancellable; every code check spends one of
+        this call's few attempts.
 
         A name is required by the caller's schema, not defaulted here: this
         endpoint reveals who is dining where, and an agent that will list the
         evening's guests to anyone who asks is a data leak wearing a feature's
         clothes.
         """
+        if code is not None:
+            state.spend_code_attempt()
         bookings = await self._bookings.find_bookings(guest_name, booking_date)
+        if code is not None and bookings:
+            # compare_digest: a code check should not leak through its timing.
+            bookings = [b for b in bookings if hmac.compare_digest(self.booking_code(b.id), code)]
+            if not bookings:
+                raise WrongBookingCodeError()
         # The date is known only because the guest just said it: ops-core-api
         # can filter bookings by date but does not return the slot's date or
         # time, so that is the most we can read back. See the README.
-        return [state.register_booking(booking, slot_date=booking_date, made_here=False) for booking in bookings]
+        return [
+            state.register_booking(booking, slot_date=booking_date, cancellable=code is not None)
+            for booking in bookings
+        ]
+
+    def booking_code(self, booking_id: UUID) -> str:
+        """Four digits a guest can note down and say back on a later call.
+
+        Derived, not stored: ops-core-api has no field for it, and an HMAC of
+        the booking id needs none. Booking ids are visible elsewhere (ops-core's
+        own API), so a plain hash would let anyone compute the code; the key is
+        the ops-core key, held only by those who could cancel through ops-core
+        directly anyway. Rotating that key changes every code.
+        """
+        digest = hmac.new(self._code_key, booking_id.bytes, sha256).digest()
+        return f"{int.from_bytes(digest[:8], 'big') % 10_000:04d}"
 
     async def cancel(self, state: DialogSessionState, booking_ref: str) -> BookingSummary:
         """Cancel a booking made during this conversation, and only such a booking."""
