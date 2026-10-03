@@ -105,6 +105,11 @@ if __name__ == "__main__":
         WorkerOptions(
             entrypoint_fnc=entrypoint,
             prewarm_fnc=prewarm,
+            # prewarm loads Silero and Whisper; a replacement process spawned
+            # while a call is using the CPU can take longer than the 10 s default.
+            # Past it, livekit-agents kills the process with SIGUSR1, which is
+            # logged as "process exited with non-zero exit code -10".
+            initialize_process_timeout=60.0,
             ws_url=livekit_settings.url,
             api_key=livekit_settings.api_key,
             api_secret=livekit_settings.api_secret.get_secret_value(),
