@@ -4,6 +4,8 @@ Nothing is stubbed: real middleware, real routing, real error handling. What is
 checked here is the wiring, which unit tests of the service cannot see.
 """
 
+from uuid import UUID
+
 import jwt
 import pytest
 from fastapi import FastAPI
@@ -155,3 +157,11 @@ async def test_an_unhandled_error_is_a_500_that_still_carries_the_request_id(app
     assert response.status_code == 500
     assert response.json()["error_code"] == "internal_server_error"
     assert response.headers["X-Request-ID"] == "abc-123"
+
+
+async def test_a_malformed_request_id_is_replaced(client: AsyncClient) -> None:
+    # Echoed, forwarded upstream and logged, so a markup or oversized id is replaced.
+    for bad in ("attacker-<script>", "r" * 129):
+        response = await client.get("/no-such-route", headers={"X-Request-ID": bad})
+
+        assert UUID(response.headers["X-Request-ID"])
