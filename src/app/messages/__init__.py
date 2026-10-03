@@ -84,6 +84,20 @@ DEGRADATION_MESSAGES: Final[dict[str, dict[str, str]]] = {
 }
 
 
+# The opening line, spoken as is. Fixed text rather than a prompt so that its audio can be
+# synthesised before anyone calls (see voice/greeting_audio.py): asking a model to write
+# it and a remote voice to say it costs the guest 7-10 seconds of silence after joining.
+GREETINGS: Final[dict[str, str]] = {
+    "ru": "Здравствуйте, я {agent_name} из {venue_name}. На какую дату вы хотите забронировать столик и на сколько человек?",
+    "en": "Hello, I'm {agent_name} from {venue_name}. Which date would you like to book, and for how many people?",
+}
+
+
+def greeting_line(language: str, agent_name: str, venue_name: str) -> str:
+    template = GREETINGS.get(language) or GREETINGS[_FALLBACK_LANGUAGE]
+    return template.format(agent_name=agent_name, venue_name=venue_name)
+
+
 def phrase(language: str, code: str) -> str:
     """Look up a sentence, falling back to English rather than to nothing."""
     table = ERROR_PHRASES.get(language) or ERROR_PHRASES[_FALLBACK_LANGUAGE]

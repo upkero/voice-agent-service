@@ -20,6 +20,7 @@ from collections.abc import Callable
 from datetime import date
 
 from src.app.core.settings.agent import AgentSettings
+from src.app.messages import greeting_line
 from src.app.prompts import get_prompt
 
 
@@ -56,6 +57,10 @@ class BaseDialogFlow(ABC):
     @abstractmethod
     def greeting(self) -> str: ...
 
+    @abstractmethod
+    def greeting_text(self) -> str:
+        """The opening line, word for word. Fixed text so its audio can be made ahead of the call."""
+
     def context(self) -> str:
         """Facts that change between calls.
 
@@ -82,7 +87,7 @@ class RestaurantBookingFlow(BaseDialogFlow):
 
     def persona(self) -> str:
         return get_prompt("persona").render(
-            agent_name=self._settings.name,
+            agent_name=self._settings.display_name,
             venue_name=self._settings.venue_name,
             reply_language=self._reply_language,
         )
@@ -108,7 +113,10 @@ class RestaurantBookingFlow(BaseDialogFlow):
         is in Russian. `persona` had this right already.
         """
         return get_prompt("greeting").render(
-            agent_name=self._settings.name,
+            agent_name=self._settings.display_name,
             venue_name=self._settings.venue_name,
             reply_language=self._reply_language,
         )
+
+    def greeting_text(self) -> str:
+        return greeting_line(self._settings.language, self._settings.display_name, self._settings.venue_name)

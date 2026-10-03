@@ -79,13 +79,33 @@ def test_the_greeting_names_the_reply_language_rather_than_being_translated(lang
 
 def test_the_venue_and_name_come_from_settings() -> None:
     flow = RestaurantBookingFlow(
-        AgentSettings(language="en", name="Nadia", venue_name="Bell & Anchor"),
+        AgentSettings(language="ru", name="Nadia", venue_name="Bell & Anchor"),
         today=lambda: TODAY,
     )
 
     prompt = flow.system_prompt()
     assert "Nadia" in prompt
     assert "Bell & Anchor" in prompt
+
+
+def test_an_english_call_uses_the_latin_name_and_says_it_in_the_greeting() -> None:
+    flow = RestaurantBookingFlow(
+        AgentSettings(_env_file=None, language="en", name="Мила", name_en="Mila", venue_name="Aurora"),
+        today=lambda: TODAY,
+    )
+
+    assert "Mila" in flow.system_prompt()
+    assert "Мила" not in flow.system_prompt()
+    assert flow.greeting_text() == "Hello, I'm Mila from Aurora. Which date would you like to book, and for how many people?"
+
+
+def test_a_russian_call_keeps_the_cyrillic_name() -> None:
+    flow = RestaurantBookingFlow(
+        AgentSettings(_env_file=None, language="ru", name="Мила", name_en="Mila", venue_name="Aurora"),
+        today=lambda: TODAY,
+    )
+
+    assert flow.greeting_text().startswith("Здравствуйте, я Мила из Aurora.")
 
 
 def test_a_subclass_can_replace_a_step_without_reordering_the_skeleton() -> None:

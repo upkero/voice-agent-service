@@ -25,6 +25,12 @@ class AgentSettings(BaseSettings):
         max_length=40,
         description="What the agent calls herself.",
     )
+    name_en: str = Field(
+        default="Mila",
+        min_length=1,
+        max_length=40,
+        description="What she calls herself on an English call: a Cyrillic name read by an English voice is mangled.",
+    )
     venue_name: str = Field(
         default="Aurora",
         min_length=1,
@@ -45,6 +51,11 @@ class AgentSettings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(env_prefix="AGENT_", env_file=".env", extra="ignore")
+
+    @property
+    def display_name(self) -> str:
+        """The name she gives on this call, in the script the call's voice can say."""
+        return self.name_en if self.language == "en" else self.name
 
     def for_language(self, language: str | None) -> "AgentSettings":
         """This call's settings: the configured ones with the guest's language on top.
