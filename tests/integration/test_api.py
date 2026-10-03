@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from src.app.api.v1.dependencies import get_livekit_gateway
+from src.app.bootstrap.container import ApplicationContainer
 from src.app.core.settings.livekit import get_livekit_settings
 from tests.fakes import FakeLiveKitGateway
 
@@ -165,3 +166,17 @@ async def test_a_malformed_request_id_is_replaced(client: AsyncClient) -> None:
         response = await client.get("/no-such-route", headers={"X-Request-ID": bad})
 
         assert UUID(response.headers["X-Request-ID"])
+
+
+async def test_a_misconfiguration_fails_the_boot_not_the_first_request(
+    app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A container property that cannot be built stands in for any misconfiguration.
+    def broken(self: ApplicationContainer) -> None:
+        raise RuntimeError("misconfigured")
+
+    monkeypatch.setattr(ApplicationContainer, "access_token_service", property(broken))
+
+    with pytest.raises(RuntimeError, match="misconfigured"):
+        async with app.router.lifespan_context(app):
+            pass

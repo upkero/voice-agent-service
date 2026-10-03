@@ -29,6 +29,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     container = ApplicationContainer()
     app.state.container = container
     try:
+        # The container is lazy; build the graph the requests use now, so a
+        # misconfiguration fails the boot instead of the first request.
+        _ = container.access_token_service, container.livekit_gateway
         yield
     finally:
         await container.close()
