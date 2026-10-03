@@ -1,5 +1,6 @@
 services:
   livekit:
+    restart: unless-stopped
     # Pinned: rtc.enable_loopback_candidate in config/livekit.yaml needs >= 1.13.
     image: livekit/livekit-server:v1.13.4
     # --dev issues the well-known devkey/secret pair and skips TLS, which is
@@ -21,6 +22,7 @@ services:
       retries: 10
 
   voice-api:
+    restart: unless-stopped
     build:
       context: .
       target: api
@@ -44,6 +46,7 @@ services:
   # so in production it moves to its own GPU instance unchanged — a peer service,
   # not part of the app. WhisperLive does LocalAgreement streaming over faster-whisper.
   whisper:
+    restart: unless-stopped
     profiles: ["selfhost-stt"]
     # CPU image by default. For the GPU box use ghcr.io/collabora/whisperlive-gpu
     # and the deploy.resources block below. Pin the tag before deploying; verify
@@ -61,6 +64,7 @@ services:
     #           capabilities: [gpu]
 
   voice-agent:
+    restart: unless-stopped
     build:
       context: .
       target: agent

@@ -92,6 +92,11 @@ USER appuser
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('${WHISPER_MODEL}', device='cpu', compute_type='int8')" && \
     python -c "from livekit.plugins import silero; silero.VAD.load()"
 
+# livekit-agents serves its own health endpoint on :8081: 503 when the worker
+# has lost LiveKit or its inference process. start-period covers prewarm, which
+# loads Whisper and Silero before the worker registers.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8081/')"
+
 # `start` rather than `dev`: dev watches the filesystem and reloads, which is
 # not what a container should do to a live call.
 CMD ["python", "-m", "src.entrypoint", "start"]

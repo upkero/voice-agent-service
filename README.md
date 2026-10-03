@@ -103,7 +103,7 @@ cold start pulls nothing.
 curl http://localhost:8080/health/live
 # {"status":"ok"}
 
-# Readiness — can it reach the LiveKit server
+# Readiness — can it reach the LiveKit server (and nothing else)
 curl http://localhost:8080/health/ready
 # {"status":"ok"}   (503 if LiveKit is unreachable)
 
@@ -114,6 +114,12 @@ curl -X POST http://localhost:8080/api/v1/token \
 # {"token":"eyJ…","room_name":"table-demo","participant_name":"demo-x1y2z3",
 #  "livekit_url":"ws://localhost:7880","expires_at":"…","language":"en"}
 ```
+
+`/health/ready` checks LiveKit only. It does not see the agent worker or ops-core-api: an ops-core
+outage is a spoken degradation rather than unreadiness, and the worker has its own Docker
+`HEALTHCHECK` (livekit-agents' built-in `:8081/`, 503 once it loses LiveKit). Every service runs with
+`restart: unless-stopped`, so a crashed worker comes back on its own; `docker compose ps` shows its
+health.
 
 `language` (`ru|en`, optional) sets the language of that call; without it the service uses `AGENT_LANGUAGE`.
 The worker opens with a fixed greeting per language, synthesised once at start-up (`AGENT_NAME_EN` is the
@@ -382,6 +388,10 @@ docker compose up --build
   направить `LLM_*` на любой OpenAI-совместимый эндпоинт.
 
 ## Эндпоинты и подключение
+
+`/health/ready` проверяет только LiveKit — ни воркер, ни ops-core-api он не видит (недоступный ops-core —
+это голосовая деградация, а не «не готов»). У воркера свой Docker `HEALTHCHECK` на встроенный `:8081/`
+livekit-agents, у всех сервисов `restart: unless-stopped`.
 
 `POST /api/v1/token` (см. curl в английской части) возвращает JWT и `livekit_url`. Необязательное поле `language` (`ru|en`) задаёт язык звонка,
 иначе берётся `AGENT_LANGUAGE`; приветствие фиксированное, синтезируется один раз при старте воркера. Готового
