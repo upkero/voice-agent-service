@@ -25,6 +25,7 @@ from src.app.messages import degradation_message
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import BookingTools
 from src.app.voice.agent import BookingAgent
+from src.app.voice.greeting_audio import cached_greeting, replay
 from src.app.voice.degradation import DegradationNotice
 
 logger = getLogger(__name__)
@@ -159,8 +160,14 @@ async def greet(
     that people hang up on. If the greeting cannot be spoken, the same opening
     goes out as text — the call still starts.
     """
+    text = agent.flow.greeting_text()
+    frames = cached_greeting(language, text)
     try:
-        await session.generate_reply(instructions=agent.flow.greeting())
+        if frames is not None:
+            # Made ahead of the call, so the first words start at once.
+            await session.say(text, audio=replay(frames))
+        else:
+            await session.generate_reply(instructions=agent.flow.greeting())
     except Exception:
         logger.exception("Could not deliver the greeting by voice")
         await notice.announce_once("tts", degradation_message(language, "tts"))

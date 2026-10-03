@@ -39,6 +39,15 @@ def create_tts(settings: TTSSettings, language: str) -> tts.TTS[Any]:
     return tts.FallbackAdapter([primary, fallback])
 
 
+def create_primary_tts(settings: TTSSettings, language: str) -> tts.TTS[Any]:
+    """The primary provider alone, with no fallback wrapper.
+
+    For work that wants exactly one voice and a client it can close: a FallbackAdapter
+    does not close its members.
+    """
+    return _build_one(settings.provider, settings, language)
+
+
 def _build_one(
     provider: TTSProvider, settings: TTSSettings, language: str, *, as_fallback: bool = False
 ) -> tts.TTS[Any]:

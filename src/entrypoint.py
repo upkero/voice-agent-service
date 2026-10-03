@@ -22,8 +22,10 @@ from src.app.core.settings.agent import get_agent_settings
 from src.app.core.settings.livekit import get_livekit_settings
 from src.app.core.settings.logging import get_logging_settings
 from src.app.core.settings.stt import get_stt_settings
+from src.app.core.settings.tts import get_tts_settings
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import DegradationNotice
+from src.app.voice.greeting_audio import prewarm_greetings_in_background
 from src.app.voice.session import build_agent, build_session, greet, register_degradation_notices, start_session
 
 logger = getLogger(__name__)
@@ -45,6 +47,7 @@ def prewarm(proc: JobProcess) -> None:
         from src.app.llm.faster_whisper_stt_client import load_model
 
         load_model(stt_settings.model, stt_settings.compute_type)
+    prewarm_greetings_in_background(get_agent_settings(), get_tts_settings())
     logger.info("Worker prewarmed", extra={"language": get_agent_settings().language})
 
 
