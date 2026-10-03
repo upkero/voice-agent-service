@@ -25,8 +25,8 @@ from src.app.messages import degradation_message
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import BookingTools
 from src.app.voice.agent import BookingAgent
-from src.app.voice.greeting_audio import cached_greeting, replay
 from src.app.voice.degradation import DegradationNotice
+from src.app.voice.greeting_audio import cached_greeting, replay
 
 logger = getLogger(__name__)
 
