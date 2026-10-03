@@ -7,7 +7,7 @@ checked here is the wiring, which unit tests of the service cannot see.
 import jwt
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from src.app.api.v1.dependencies import get_livekit_gateway
 from src.app.core.settings.livekit import get_livekit_settings
@@ -127,3 +127,31 @@ async def test_an_unsupported_language_is_refused(client: AsyncClient) -> None:
     response = await client.post("/api/v1/token", json={"language": "de"})
 
     assert response.status_code == 422
+
+
+async def test_a_form_body_is_a_validation_error_not_a_crash(client: AsyncClient) -> None:
+    # curl's default content type when -H 'Content-Type: application/json' is
+    # forgotten. Pydantic keeps the raw bytes in the error, undecodable ones too.
+    for body in (b"room_name=table-7", b"\xff\xfe"):
+        response = await client.post(
+            "/api/v1/token",
+            content=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error_code"] == "request_validation_error"
+
+
+async def test_an_unhandled_error_is_a_500_that_still_carries_the_request_id(app: FastAPI) -> None:
+    async def boom() -> None:
+        raise RuntimeError("boom")
+
+    app.add_api_route("/boom", boom)
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as raw_client:
+        response = await raw_client.get("/boom", headers={"X-Request-ID": "abc-123"})
+
+    assert response.status_code == 500
+    assert response.json()["error_code"] == "internal_server_error"
+    assert response.headers["X-Request-ID"] == "abc-123"
