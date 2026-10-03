@@ -273,7 +273,7 @@ uv run mypy src
 uv run pytest --cov=src/app/services --cov-report=term-missing
 ```
 
-155 tests, ~97% coverage on the service layer. No database and no network: the `BookingGateway`
+165 tests, ~97% coverage on the service layer. No database and no network: the `BookingGateway`
 port is replaced with an in-memory fake (its second implementation), so the whole suite runs
 offline. CI runs the same four commands on every push.
 
@@ -492,6 +492,6 @@ uv sync && uv run ruff check . && uv run mypy src
 uv run pytest --cov=src/app/services --cov-report=term-missing
 ```
 
-155 тестов, ~97% покрытия слоя services. Ни базы, ни сети: порт `BookingGateway` заменяется
+165 тестов, ~97% покрытия слоя services. Ни базы, ни сети: порт `BookingGateway` заменяется
 in-memory фейком (его вторая реализация), так что весь набор идёт офлайн. CI гоняет те же команды на
 каждый push.
