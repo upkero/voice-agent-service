@@ -1,1 +1,1 @@
-Find an existing reservation made on an earlier call. Needs both the name it was made under and the date. Not needed for a booking made during this call — use its reference directly.
+Find an existing reservation made on an earlier call, to read it back to the guest. Needs both the name it was made under and the date. A booking found this way cannot be cancelled by phone. Not needed for a booking made during this call — use its reference directly.

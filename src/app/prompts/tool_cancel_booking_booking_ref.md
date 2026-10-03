@@ -1,1 +1,1 @@
-A reference from create_booking or find_booking, e.g. 'booking_1'.
+A reference from create_booking in this call, e.g. 'booking_1'.

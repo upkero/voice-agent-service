@@ -8,7 +8,7 @@ from datetime import time
 
 import pytest
 
-from src.app.exceptions.booking import BookingNotFoundError
+from src.app.exceptions.booking import BookingNotFoundError, NotCancellableError
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
 from tests.fakes import TOMORROW, FakeBookingGateway
@@ -56,20 +56,24 @@ async def test_cancelling_an_unknown_booking_fails_clearly(
         await reservations.cancel(state, booked.ref)
 
 
-async def test_finding_a_booking_registers_it_for_cancelling(
-    reservations: ReservationService, state: DialogSessionState
+async def test_a_booking_found_by_name_and_date_cannot_be_cancelled(
+    reservations: ReservationService, state: DialogSessionState, repository: FakeBookingGateway
 ) -> None:
-    """A reservation from an earlier call becomes cancellable the moment it is
-    found, without its identifier ever being spoken."""
+    """A name and a date are guessable, so they prove nothing about who is calling.
+
+    Anyone could ring up and say "cancel Anna's table on Saturday". Only a
+    booking made during this call — whose reference this session issued — can
+    be cancelled by voice.
+    """
     offers = await reservations.find_offers(state, TOMORROW, 4, preferred_time=None)
     await reservations.reserve(state, offers[0].ref, "Petrova", 4)
 
-    later_call = DialogSessionState("second-call")
-    found = await reservations.find_existing(later_call, "Petrova", TOMORROW)
+    stranger = DialogSessionState("second-call")
+    found = await reservations.find_existing(stranger, "Petrova", TOMORROW)
 
-    cancelled = await reservations.cancel(later_call, found[0].ref)
-
-    assert cancelled.guest_name == "Petrova"
+    with pytest.raises(NotCancellableError):
+        await reservations.cancel(stranger, found[0].ref)
+    assert all(b.status.value == "active" for b in repository.bookings.values())
 
 
 async def test_a_cancelled_booking_is_not_found_again(

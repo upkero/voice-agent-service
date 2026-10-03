@@ -109,11 +109,11 @@ class ReservationService:
         # The date is known only because the guest just said it: ops-core-api
         # can filter bookings by date but does not return the slot's date or
         # time, so that is the most we can read back. See the README.
-        return [state.register_booking(booking, slot_date=booking_date) for booking in bookings]
+        return [state.register_booking(booking, slot_date=booking_date, made_here=False) for booking in bookings]
 
     async def cancel(self, state: DialogSessionState, booking_ref: str) -> BookingSummary:
-        """Cancel a booking this conversation knows about."""
-        booking = state.resolve_booking(booking_ref)
+        """Cancel a booking made during this conversation, and only such a booking."""
+        booking = state.resolve_cancellable(booking_ref)
         summary = state.summarise_booking(booking_ref)
         await self._bookings.cancel_booking(booking.id)
         # Closing the intent is what lets the guest immediately rebook the same

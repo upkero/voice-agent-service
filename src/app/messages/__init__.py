@@ -37,6 +37,10 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         "slot_unavailable": "Извините, этот столик только что заняли. Посмотрю, что есть рядом по времени.",
         "slot_capacity_exceeded": "За этот столик столько гостей не поместится. Подберу побольше.",
         "entity_not_found": "Не нахожу брони на это имя и число. Может быть, она на другой день?",
+        "not_cancellable": (
+            "Отменить по телефону я могу только бронь, сделанную в этом звонке. "
+            "Чтобы отменить эту, позвоните, пожалуйста, администратору."
+        ),
         "unknown_reference": "Кажется, я потеряла нить. Давайте уточним: на какое число и на сколько человек?",
         "booking_error": "Что-то пошло не так с бронированием. Давайте попробуем ещё раз.",
         "not_confirmed": "Поняла, ничего не бронирую. Скажите, когда будете готовы подтвердить.",
@@ -55,6 +59,10 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         "slot_unavailable": "Sorry, that table has just been taken. Let me see what's free around that time.",
         "slot_capacity_exceeded": "That table won't seat your party. Let me find a bigger one.",
         "entity_not_found": "I can't find a booking under that name for that date. Might it be another day?",
+        "not_cancellable": (
+            "I can only cancel a booking made during this call. "
+            "To cancel this one, please call the restaurant directly."
+        ),
         "unknown_reference": "I've lost the thread there. Which date, and for how many people?",
         "booking_error": "Something went wrong with the booking. Let's try that again.",
         "not_confirmed": "Understood, I won't book anything. Just say the word when you're ready.",

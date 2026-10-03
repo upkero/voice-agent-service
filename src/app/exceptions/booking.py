@@ -109,6 +109,19 @@ class InactiveBookingError(BookingError):
     default_detail = "The booking service returned a booking that is not active."
 
 
+class NotCancellableError(BookingError):
+    """The booking was found by name and date, not made during this call.
+
+    A name and a date are guessable, so they do not prove the caller owns the
+    booking. Cancelling by voice is limited to what this call booked; anything
+    else goes to a person.
+    """
+
+    status_code = 403
+    error_code = "not_cancellable"
+    default_detail = "Only a booking made during this call can be cancelled."
+
+
 class UnknownReferenceError(BookingError):
     """The model used a slot or booking reference this session never issued.
 

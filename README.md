@@ -26,7 +26,7 @@ leave the machine.
 |---|---|
 | Voice pipeline | LiveKit WebRTC transport, Silero VAD, STT → LLM → TTS via `AgentSession`. |
 | Deterministic tools | Four function tools with explicit JSON Schema + Pydantic validation before dispatch, so a mishearing cannot take a table. |
-| Booking | Checks availability, offers the nearest real slots, books, finds and cancels — all against ops-core-api over HTTP. |
+| Booking | Checks availability, offers the nearest real slots, books, finds and cancels — all against ops-core-api over HTTP. Only a booking made during the same call can be cancelled. |
 | Bilingual | The language is chosen per call (`language` in the token request); `AGENT_LANGUAGE=ru\|en` is only the default. It switches the Whisper hint, the piper voice, the persona and a fixed, pre-synthesised greeting. |
 | Graceful degradation | ops-core-api down, or an exhausted STT/TTS fallback chain, produces a spoken or data-channel explanation — never silence. |
 
@@ -236,6 +236,12 @@ real IDs. A reference the session never issued cannot resolve, so a hallucinated
 locally instead of reaching ops-core-api. A booking made during the call is cancellable by its
 reference with no second lookup.
 
+**Only this call's bookings can be cancelled.** `find_booking` finds a reservation by name and
+date and can read it back, but a name and a date are guessable and prove nothing about who is
+calling, so such a booking is not cancellable by voice — Мила sends the guest to the restaurant.
+Cancelling an older booking by phone would need a second factor (a booking code or the phone
+number it was made with) stored in ops-core-api, which it does not have yet.
+
 **All model-facing text lives in `prompts/`.** The system prompt's five sections and every tool
 `description` are Markdown files loaded at import, in English, with the reply language as a
 `{reply_language}` placeholder rather than a translated copy — a translated prompt forks on the
@@ -334,7 +340,7 @@ Web Speech API.
 |---|---|
 | Голосовой пайплайн | LiveKit WebRTC, Silero VAD, STT → LLM → TTS через `AgentSession`. |
 | Детерминированные инструменты | Четыре function-tool со строгой JSON Schema и валидацией Pydantic до вызова — ослышка не приводит к брони. |
-| Бронирование | Проверка наличия, ближайшие реальные слоты, бронь, поиск и отмена — всё через HTTP к ops-core-api. |
+| Бронирование | Проверка наличия, ближайшие реальные слоты, бронь, поиск и отмена — всё через HTTP к ops-core-api. Отменить можно только бронь, сделанную в этом же звонке: имя и дата угадываются и ничего не доказывают. |
 | Двуязычность | `AGENT_LANGUAGE=ru\|en` переключает подсказку Whisper, голос piper и персону одной настройкой. |
 | Грациозная деградация | Недоступность ops-core-api или исчерпанная цепочка fallback'ов STT/TTS даёт голосовое или текстовое объяснение — не тишину. |
 

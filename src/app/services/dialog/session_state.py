@@ -23,7 +23,7 @@ certainty. The static pattern rejects nothing this would have caught.
 from datetime import date, time
 
 from src.app.contracts.booking import BookingDTO, BookingSummary, SlotDTO, SlotOffer
-from src.app.exceptions.booking import UnknownReferenceError
+from src.app.exceptions.booking import NotCancellableError, UnknownReferenceError
 
 
 class DialogSessionState:
@@ -34,6 +34,9 @@ class DialogSessionState:
         self._slots: dict[str, SlotDTO] = {}
         self._bookings: dict[str, BookingDTO] = {}
         self._summaries: dict[str, BookingSummary] = {}
+        # References of bookings made during this call: the only ones a voice
+        # caller has proved they own.
+        self._made_here: set[str] = set()
         # Incremented on every cancellation. It is what makes the idempotency
         # key describe the current *intent* rather than a repeatable set of
         # arguments — see ReservationService.reserve for why that is required.
@@ -74,13 +77,13 @@ class DialogSessionState:
         *,
         slot_date: date | None = None,
         slot_time: time | None = None,
+        made_here: bool = True,
     ) -> BookingSummary:
-        """Remember a booking so it can be cancelled later in the same call.
+        """Remember a booking so the model can refer to it.
 
-        This is what lets a guest who changes their mind be handled without a
-        lookup: the reference is already here, so cancelling goes straight to
-        the identifier with no name matching and no chance of reaching somebody
-        else's table.
+        One made during this call (`made_here`) can be cancelled later in the
+        same call without a lookup. One found by name and date can only be read
+        back: a name and a date prove nothing about who is calling.
         """
         # A replayed booking is the same booking. Issuing it a second reference
         # would show the model two reservations where the guest has one, and
@@ -99,12 +102,20 @@ class DialogSessionState:
         )
         self._bookings[ref] = booking
         self._summaries[ref] = summary
+        if made_here:
+            self._made_here.add(ref)
         return summary
 
     def resolve_booking(self, ref: str) -> BookingDTO:
         booking = self._bookings.get(ref)
         if booking is None:
             raise UnknownReferenceError(f"Booking reference '{ref}' is not one from this conversation.")
+        return booking
+
+    def resolve_cancellable(self, ref: str) -> BookingDTO:
+        booking = self.resolve_booking(ref)
+        if ref not in self._made_here:
+            raise NotCancellableError(f"Booking reference '{ref}' was found, not made, in this conversation.")
         return booking
 
     def summarise_booking(self, ref: str) -> BookingSummary:
