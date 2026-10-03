@@ -12,7 +12,9 @@ browser Web-Speech imitation.
 
 Offline-first: speech recognition (faster-whisper) and speech synthesis (piper) both run locally,
 and LiveKit runs in development mode. `docker compose up` needs **no cloud account and no API key
-for speech** — only the key of the ops-core-api instance holding the booking data.
+for speech** — only the key of the ops-core-api instance holding the booking data. If you point
+`LLM_*` or `TTS_*` at a hosted provider (the public demo does, via OpenRouter), transcripts and replies
+leave the machine.
 
 *[Русская версия ниже](#voice-agent-service-русская-версия).*
 
@@ -25,7 +27,7 @@ for speech** — only the key of the ops-core-api instance holding the booking d
 | Voice pipeline | LiveKit WebRTC transport, Silero VAD, STT → LLM → TTS via `AgentSession`. |
 | Deterministic tools | Four function tools with explicit JSON Schema + Pydantic validation before dispatch, so a mishearing cannot take a table. |
 | Booking | Checks availability, offers the nearest real slots, books, finds and cancels — all against ops-core-api over HTTP. |
-| Bilingual | `AGENT_LANGUAGE=ru\|en` switches the Whisper hint, the piper voice and the persona in one setting. |
+| Bilingual | The language is chosen per call (`language` in the token request); `AGENT_LANGUAGE=ru\|en` is only the default. It switches the Whisper hint, the piper voice, the persona and a fixed, pre-synthesised greeting. |
 | Graceful degradation | ops-core-api down, or an exhausted STT/TTS fallback chain, produces a spoken or data-channel explanation — never silence. |
 
 Two processes live in this repo:
@@ -103,10 +105,14 @@ curl http://localhost:8080/health/ready
 # Mint a join token (room name optional — a private one is generated if omitted)
 curl -X POST http://localhost:8080/api/v1/token \
   -H 'content-type: application/json' \
-  -d '{"participant_name": "demo", "room_name": "table-demo"}'
+  -d '{"participant_name": "demo", "room_name": "table-demo", "language": "en"}'
 # {"token":"eyJ…","room_name":"table-demo","participant_name":"demo-x1y2z3",
-#  "livekit_url":"ws://localhost:7880","expires_at":"…"}
+#  "livekit_url":"ws://localhost:7880","expires_at":"…","language":"en"}
 ```
+
+`language` (`ru|en`, optional) sets the language of that call; without it the service uses `AGENT_LANGUAGE`.
+The worker opens with a fixed greeting per language, synthesised once at start-up (`AGENT_NAME_EN` is the
+Latin name used on English calls).
 
 `POST /api/v1/token` is the one endpoint a browser calls, and `CORS_ALLOWED_ORIGINS` defaults to
 empty — no origin is allowed until you name one. Set it (CSV, e.g.
@@ -242,7 +248,7 @@ uv run mypy src
 uv run pytest --cov=src/app/services --cov-report=term-missing
 ```
 
-140 tests, ~97% coverage on the service layer. No database and no network: the `BookingGateway`
+155 tests, ~97% coverage on the service layer. No database and no network: the `BookingGateway`
 port is replaced with an in-memory fake (its second implementation), so the whole suite runs
 offline. CI runs the same four commands on every push.
 
@@ -361,7 +367,8 @@ docker compose up --build
 
 ## Эндпоинты и подключение
 
-`POST /api/v1/token` (см. curl в английской части) возвращает JWT и `livekit_url`. Готового
+`POST /api/v1/token` (см. curl в английской части) возвращает JWT и `livekit_url`. Необязательное поле `language` (`ru|en`) задаёт язык звонка,
+иначе берётся `AGENT_LANGUAGE`; приветствие фиксированное, синтезируется один раз при старте воркера. Готового
 веб-клиента в репозитории нет — демо будет жить на сайте-портфолио. Прямо сейчас подключиться проще
 всего через [LiveKit Agents Playground](https://agents-playground.livekit.io): вставьте `livekit_url`
 и `token`, подключитесь и скажите *«стол на четверых завтра в семь вечера»* (при `AGENT_LANGUAGE=ru`).
@@ -434,6 +441,6 @@ uv sync && uv run ruff check . && uv run mypy src
 uv run pytest --cov=src/app/services --cov-report=term-missing
 ```
 
-140 тестов, ~97% покрытия слоя services. Ни базы, ни сети: порт `BookingGateway` заменяется
+155 тестов, ~97% покрытия слоя services. Ни базы, ни сети: порт `BookingGateway` заменяется
 in-memory фейком (его вторая реализация), так что весь набор идёт офлайн. CI гоняет те же команды на
 каждый push.
