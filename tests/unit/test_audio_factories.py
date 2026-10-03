@@ -158,3 +158,16 @@ def test_a_cloud_voice_name_is_not_used_for_the_piper_fallback() -> None:
 
 def test_an_explicit_voice_still_wins_when_piper_is_the_primary() -> None:
     assert _tts(provider="piper", voice="ru_RU-irina-medium").resolve_voice("en") == "ru_RU-irina-medium"
+
+
+@pytest.mark.parametrize(("language", "word"), [("en", "book a table"), ("ru", "бронь")])
+def test_local_whisper_is_primed_with_booking_vocabulary(language: str, word: str) -> None:
+    """Unprimed, Whisper heard "Please book it" as a swear word on a live call."""
+    from src.app.llm.faster_whisper_stt_client import FasterWhisperSTTClient
+
+    model = Mock()
+    model.transcribe.return_value = ([], None)
+
+    FasterWhisperSTTClient(_stt(), language)._transcribe(model, b"\x00\x00" * 160, language)
+
+    assert word in model.transcribe.call_args.kwargs["initial_prompt"]

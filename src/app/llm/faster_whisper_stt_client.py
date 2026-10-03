@@ -17,6 +17,7 @@ from livekit.agents.types import NOT_GIVEN, APIConnectOptions
 
 from src.app.core.settings.stt import STTSettings
 from src.app.interfaces.llm.stt_client import STTClient
+from src.app.messages import stt_vocabulary
 
 logger = getLogger(__name__)
 
@@ -95,5 +96,6 @@ class FasterWhisperSTTClient(STTClient):
             # would cost latency on a live call for accuracy nobody notices.
             beam_size=1,
             vad_filter=True,
+            initial_prompt=stt_vocabulary(language),
         )
         return " ".join(segment.text.strip() for segment in segments).strip()

@@ -111,6 +111,22 @@ FILLERS: Final[dict[str, str]] = {
 }
 
 
+# Context handed to local Whisper before each utterance. Not instructions: Whisper
+# continues text, so a line of the words a booking call uses makes it prefer them
+# (unprimed, it heard "Please book it" as a swear word). Per language, like the rest.
+STT_VOCABULARY: Final[dict[str, str]] = {
+    "ru": "Здравствуйте, хочу забронировать столик. Бронь на четверых на завтра, на семь вечера. Отменить бронь.",
+    "en": (
+        "Hello, I'd like to book a table. A reservation for four tomorrow at seven. "
+        "Please book it. Cancel my booking."
+    ),
+}
+
+
+def stt_vocabulary(language: str) -> str:
+    return STT_VOCABULARY.get(language) or STT_VOCABULARY[_FALLBACK_LANGUAGE]
+
+
 def filler_line(language: str) -> str:
     return FILLERS.get(language) or FILLERS[_FALLBACK_LANGUAGE]
 
