@@ -88,7 +88,10 @@ DEGRADATION_MESSAGES: Final[dict[str, dict[str, str]]] = {
 # synthesised before anyone calls (see voice/greeting_audio.py): asking a model to write
 # it and a remote voice to say it costs the guest 7-10 seconds of silence after joining.
 GREETINGS: Final[dict[str, str]] = {
-    "ru": "Здравствуйте, я {agent_name} из {venue_name}. На какую дату вы хотите забронировать столик и на сколько человек?",
+    "ru": (
+        "Здравствуйте, я {agent_name} из {venue_name}. "
+        "На какую дату вы хотите забронировать столик и на сколько человек?"
+    ),
     "en": "Hello, I'm {agent_name} from {venue_name}. Which date would you like to book, and for how many people?",
 }
 
