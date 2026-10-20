@@ -26,7 +26,14 @@ from src.app.core.settings.tts import get_tts_settings
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import DegradationNotice
 from src.app.voice.greeting_audio import prewarm_greetings_in_background
-from src.app.voice.session import build_agent, build_session, greet, register_degradation_notices, start_session
+from src.app.voice.session import (
+    build_agent,
+    build_session,
+    greet,
+    native_turn_model_supported,
+    register_degradation_notices,
+    start_session,
+)
 
 logger = getLogger(__name__)
 
@@ -101,17 +108,20 @@ async def entrypoint(ctx: JobContext) -> None:
 
 if __name__ == "__main__":
     livekit_settings = get_livekit_settings()
-    cli.run_app(
-        WorkerOptions(
-            entrypoint_fnc=entrypoint,
-            prewarm_fnc=prewarm,
-            # prewarm loads Silero and Whisper; a replacement process spawned
-            # while a call is using the CPU can take longer than the 10 s default.
-            # Past it, livekit-agents kills the process with SIGUSR1, which is
-            # logged as "process exited with non-zero exit code -10".
-            initialize_process_timeout=60.0,
-            ws_url=livekit_settings.url,
-            api_key=livekit_settings.api_key,
-            api_secret=livekit_settings.api_secret.get_secret_value(),
-        )
+    options = WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        prewarm_fnc=prewarm,
+        # prewarm loads Silero and Whisper; a replacement process spawned
+        # while a call is using the CPU can take longer than the 10 s default.
+        # Past it, livekit-agents kills the process with SIGUSR1, which is
+        # logged as "process exited with non-zero exit code -10".
+        initialize_process_timeout=60.0,
+        ws_url=livekit_settings.url,
+        api_key=livekit_settings.api_key,
+        api_secret=livekit_settings.api_secret.get_secret_value(),
     )
+    if not native_turn_model_supported():
+        # The forkserver preloads livekit's native turn model, which crashes
+        # without AVX2; spawn skips that preload.
+        options.multiprocessing_context = "spawn"
+    cli.run_app(options)

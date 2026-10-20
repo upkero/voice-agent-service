@@ -7,7 +7,9 @@ whether the layering held.
 """
 
 import asyncio
+from functools import cache
 from logging import getLogger
+from pathlib import Path
 from typing import Any
 
 from livekit import rtc
@@ -31,6 +33,22 @@ from src.app.voice.greeting_audio import cached_greeting, replay
 logger = getLogger(__name__)
 
 
+@cache
+def native_turn_model_supported(cpuinfo: Path = Path("/proc/cpuinfo")) -> bool:
+    """Whether livekit's bundled turn-detector model can run on this CPU.
+
+    The native library is built for AVX2 and FMA. On older x86 hosts (a Xeon E5
+    v2 VPS, for one) it dies with an illegal instruction: in the forkserver that
+    preloads it, so no job process ever starts and the guest waits in an empty
+    room. Without /proc/cpuinfo (not Linux) there is nothing to check.
+    """
+    try:
+        flags = set(cpuinfo.read_text().split())
+    except OSError:
+        return True
+    return {"avx2", "fma"} <= flags
+
+
 def build_agent(container: ApplicationContainer, room_id: str) -> tuple[BookingAgent, DialogSessionState]:
     """One agent and one reference table per call.
 
@@ -43,7 +61,7 @@ def build_agent(container: ApplicationContainer, room_id: str) -> tuple[BookingA
 
 
 def build_session(language: str, vad: vad_module.VAD | None = None) -> AgentSession[Any]:
-
+    turn_model = native_turn_model_supported()
     session: AgentSession[Any] = AgentSession(
         vad=vad,
         # The VAD is handed to the STT factory too: when a fallback is configured
@@ -67,12 +85,19 @@ def build_session(language: str, vad: vad_module.VAD | None = None) -> AgentSess
             # number ("...for the 24th") — so it sits out the whole max delay. A
             # restaurant booking is short and turn-based, so we cap that wait
             # hard rather than leave the default in place.
-            "endpointing": {"min_delay": 0.4, "max_delay": 2.0},
+            #
+            # Without the model (no AVX2) silence alone ends the turn. Silero
+            # reports end of speech after 0.55 s of it; 0.8 s from the last word
+            # rides out a short "um" before a date or a name, and Whisper is
+            # still transcribing for most of that wait, so the guest barely pays
+            # for it.
+            "endpointing": {"min_delay": 0.4 if turn_model else 0.8, "max_delay": 2.0},
             # Start drafting the reply (and any tool call) while the final
             # transcript is still settling, instead of after. Overlaps the LLM
             # with the tail of STT, which is free latency back on a sequential
             # cloud pipeline.
             "preemptive_generation": {"enabled": True},
+            **({} if turn_model else {"turn_detection": "vad"}),
         },
     )
     return session
