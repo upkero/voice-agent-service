@@ -171,3 +171,28 @@ def test_local_whisper_is_primed_with_booking_vocabulary(language: str, word: st
     FasterWhisperSTTClient(_stt(), language)._transcribe(model, b"\x00\x00" * 160, language)
 
     assert word in model.transcribe.call_args.kwargs["initial_prompt"]
+
+
+# --- Provider labels ----------------------------------------------------------
+def test_every_client_names_its_provider_and_model() -> None:
+    """The framework labels a metric from these; the default is the string "unknown"."""
+    clients = [
+        create_stt(_stt(provider="faster_whisper", model="small", fallback_provider=None), "ru"),
+        create_stt(
+            _stt(provider="openai_compatible", base_url="https://openrouter.ai/api/v1", api_key="k", model="whisper-1",
+                 fallback_provider=None),
+            "ru",
+        ),
+        create_stt(_stt(provider="whisper_stream", whisper_stream_url="ws://w:9090", fallback_provider=None), "ru"),
+        create_tts(_tts(provider="piper"), "ru"),
+        create_tts(
+            _tts(provider="openai_compatible", base_url="https://openrouter.ai/api/v1", api_key="k", voice="eve",
+                 model="grok-voice", fallback_provider=None),
+            "ru",
+        ),
+    ]
+
+    labels = [(client.provider, client.model) for client in clients]
+
+    assert all("unknown" not in label and all(label) for label in labels), labels
+    assert labels[1][0] == labels[4][0] == "openrouter.ai"

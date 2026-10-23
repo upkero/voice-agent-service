@@ -46,6 +46,16 @@ class FasterWhisperSTTClient(STTClient):
         self._model: Any | None = None
         self._load_lock = asyncio.Lock()
 
+    # What the framework's metrics call this client; without them every series
+    # it labels says "unknown".
+    @property
+    def model(self) -> str:
+        return self._settings.model
+
+    @property
+    def provider(self) -> str:
+        return "faster-whisper"
+
     async def _ensure_model(self) -> Any:
         # Imported here, not at module scope: ctranslate2 is a heavy import and
         # the HTTP process must never pay for it. The lock stops two concurrent

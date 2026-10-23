@@ -20,6 +20,7 @@ from livekit.agents import tts
 
 from src.app.core.settings.tts import TTSProvider, TTSSettings
 from src.app.exceptions.llm import LLMConfigurationError
+from src.app.llm.fallback_adapters import ServingTTSAdapter
 
 logger = getLogger(__name__)
 
@@ -36,7 +37,7 @@ def create_tts(settings: TTSSettings, language: str) -> tts.TTS[Any]:
 
     fallback = _build_one(settings.fallback_provider, settings, language, as_fallback=True)
     logger.info("TTS fallback enabled: %s -> %s", settings.provider, settings.fallback_provider)
-    return tts.FallbackAdapter([primary, fallback])
+    return ServingTTSAdapter([primary, fallback])
 
 
 def create_primary_tts(settings: TTSSettings, language: str) -> tts.TTS[Any]:

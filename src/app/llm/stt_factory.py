@@ -32,6 +32,7 @@ from livekit.agents import vad as vad_module
 
 from src.app.core.settings.stt import STTProvider, STTSettings
 from src.app.exceptions.llm import LLMConfigurationError
+from src.app.llm.fallback_adapters import ServingSTTAdapter
 
 logger = getLogger(__name__)
 
@@ -50,7 +51,7 @@ def create_stt(settings: STTSettings, language: str, vad: vad_module.VAD | None 
 
     fallback = _build_one(settings.fallback_provider, settings, language)
     logger.info("STT fallback enabled: %s -> %s", settings.provider, settings.fallback_provider)
-    return stt.FallbackAdapter(_dedupe([primary, fallback]), vad=vad)
+    return ServingSTTAdapter(_dedupe([primary, fallback]), vad=vad)
 
 
 def _build_one(provider: STTProvider, settings: STTSettings, language: str) -> stt.STT[Any]:

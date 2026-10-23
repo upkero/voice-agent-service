@@ -47,6 +47,14 @@ class PiperTTSClient(TTSClient):
         return _PiperStream(tts=self, input_text=text, conn_options=conn_options)
 
     @property
+    def model(self) -> str:
+        return self._voice
+
+    @property
+    def provider(self) -> str:
+        return "piper"
+
+    @property
     def model_path(self) -> Path:
         return self._model_path
 

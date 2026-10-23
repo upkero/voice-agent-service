@@ -55,6 +55,14 @@ class WhisperStreamSTTClient(STTClient):
         # faster_whisper default carries over sensibly.
         self._model = settings.model
 
+    @property
+    def model(self) -> str:
+        return self._model
+
+    @property
+    def provider(self) -> str:
+        return "whisperlive"
+
     async def _recognize_impl(
         self,
         buffer: utils.AudioBuffer,

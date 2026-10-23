@@ -16,6 +16,8 @@ from livekit.agents import APIConnectionError, NotGivenOr, stt, utils
 from livekit.agents.language import LanguageCode
 from livekit.agents.types import NOT_GIVEN, APIConnectOptions
 
+from src.app.llm.fallback_adapters import ServingSTTAdapter
+
 
 class _FakeSTT(stt.STT[None]):
     def __init__(self, *, text: str | None) -> None:
@@ -72,3 +74,28 @@ async def test_all_providers_down_raises_rather_than_lying() -> None:
 
     with pytest.raises(Exception):  # noqa: B017 - livekit raises its own aggregate error type
         await adapter.recognize([_frame()])
+
+
+class _NamedSTT(_FakeSTT):
+    def __init__(self, name: str, *, text: str | None) -> None:
+        super().__init__(text=text)
+        self._name = name
+
+    @property
+    def model(self) -> str:
+        return f"{self._name}-model"
+
+    @property
+    def provider(self) -> str:
+        return self._name
+
+
+async def test_the_adapter_reports_the_provider_that_is_serving() -> None:
+    """livekit's own adapter says "livekit"/"FallbackAdapter" for the whole chain,
+    which would make every per-turn latency series unattributable."""
+    adapter = ServingSTTAdapter([_NamedSTT("primary", text=None), _NamedSTT("backup", text="ok")])
+    assert (adapter.provider, adapter.model) == ("primary", "primary-model")
+
+    await adapter.recognize([_frame()])
+
+    assert (adapter.provider, adapter.model) == ("backup", "backup-model")

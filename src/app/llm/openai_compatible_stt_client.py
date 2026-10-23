@@ -32,6 +32,14 @@ class OpenAICompatibleSTTClient(STTClient):
         self._language = settings.language or language
         self._client = client
 
+    @property
+    def model(self) -> str:
+        return self._settings.model
+
+    @property
+    def provider(self) -> str:
+        return self._client.base_url.host
+
     async def _recognize_impl(
         self,
         buffer: utils.AudioBuffer,

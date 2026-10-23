@@ -52,6 +52,14 @@ class OpenAICompatibleTTSClient(TTSClient):
         return _OpenAICompatibleStream(tts=self, input_text=text, conn_options=conn_options)
 
     @property
+    def model(self) -> str:
+        return self._settings.model
+
+    @property
+    def provider(self) -> str:
+        return self._client.base_url.host
+
+    @property
     def voice(self) -> str:
         return self._voice
 
