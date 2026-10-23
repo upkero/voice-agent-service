@@ -11,6 +11,7 @@ concurrency, and neither is a trade worth making.
 """
 
 from logging import getLogger
+from typing import get_args
 
 from livekit.agents import JobContext, JobProcess, WorkerOptions, cli, telemetry
 from livekit.plugins import silero
@@ -18,8 +19,9 @@ from opentelemetry import trace
 
 from src.app.bootstrap.container import ApplicationContainer
 from src.app.core.logging import setup_logging
+from src.app.core.metrics import preinitialise
 from src.app.core.request_id import set_request_id
-from src.app.core.settings.agent import get_agent_settings
+from src.app.core.settings.agent import AgentLanguage, get_agent_settings
 from src.app.core.settings.livekit import get_livekit_settings
 from src.app.core.settings.logging import get_logging_settings
 from src.app.core.settings.stt import get_stt_settings
@@ -57,6 +59,9 @@ def prewarm(proc: JobProcess) -> None:
     # shutdown flushes only the one it holds; otherwise a call's last spans die
     # with its process.
     telemetry.set_tracer_provider(setup_tracing("voice-agent", "voice-agent-service"))
+    # After livekit has emptied the multiprocess directory, which it does when the worker
+    # starts and before the first process: earlier, these zeros would be deleted with it.
+    preinitialise(get_args(AgentLanguage))
     proc.userdata["vad"] = silero.VAD.load()
     stt_settings = get_stt_settings()
     if "faster_whisper" in (stt_settings.provider, stt_settings.fallback_provider):

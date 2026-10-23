@@ -193,3 +193,14 @@ def test_finish_files_the_call_and_logs_one_line_without_a_name(caplog: pytest.L
     assert (record.__dict__["outcome"], record.__dict__["duration_s"]) == ("no_action", 42.5)
     assert record.__dict__["guest_name_fp"] == "abc123abc123"
     assert record.__dict__["degradations"] == ["tts"]
+
+
+def test_the_series_an_alert_reads_exist_at_zero_before_any_call() -> None:
+    """increase() cannot see the first event of a series that appears already at 1."""
+    from src.app.core.metrics import preinitialise
+
+    preinitialise(("ru", "en"))
+
+    assert REGISTRY.get_sample_value("voice_calls_total", {"outcome": "failed_start", "language": "ru"}) is not None
+    assert REGISTRY.get_sample_value("voice_degradation_notices_total", {"kind": "tts"}) is not None
+    assert REGISTRY.get_sample_value("voice_bookings_total", {"op": "find", "result": "not_found"}) is not None

@@ -64,3 +64,22 @@ LLM_TOKENS = Counter(
 STT_AUDIO_SECONDS = Counter("voice_stt_audio_seconds_total", "Audio sent to STT.", ["provider", "model"])
 TTS_CHARACTERS = Counter("voice_tts_characters_total", "Characters sent to TTS.", ["provider", "model"])
 COST_USD = Counter("voice_cost_usd_total", "Spend by component.", ["component", "provider", "model"])
+
+CALL_OUTCOMES = ("booked", "cancelled", "lookup_only", "no_action", "failed_start")
+
+
+def preinitialise(languages: tuple[str, ...]) -> None:
+    """Create the series an alert reads, at 0, before any call touches them.
+
+    `increase()` needs two samples: a counter that first appears already at 1
+    raises no alert for the event that created it. For failed_start and a degradation
+    notice that first event is exactly the one worth a page. Provider names are not
+    known here, so voice_provider_fallback_total cannot be covered this way.
+    """
+    for outcome in CALL_OUTCOMES:
+        for language in languages:
+            CALLS.labels(outcome, language)
+    for kind in ("stt", "tts", "startup"):
+        DEGRADATION_NOTICES.labels(kind)
+    for result in ("found", "not_found"):
+        BOOKINGS.labels("find", result)
