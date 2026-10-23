@@ -353,7 +353,12 @@ class BookingTools:
                 "Rejected tool arguments for %s: %s",
                 model.__name__,
                 exc.error_count(),
-                extra={"room_id": self._state.room_id, "errors": exc.errors(include_url=False)},
+                # Without the input values: a rejected argument is often a
+                # misheard guest name, and logs are not where names go.
+                extra={
+                    "room_id": self._state.room_id,
+                    "errors": exc.errors(include_url=False, include_input=False),
+                },
             )
             return None
 
