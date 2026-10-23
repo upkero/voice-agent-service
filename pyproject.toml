@@ -27,6 +27,12 @@ dependencies = [
     "livekit-plugins-cartesia>=1.6.0",
     "faster-whisper>=1.1.0",
     "websockets>=14.0",
+    # Pinned, not floored: livekit-agents 1.6.6 pins opentelemetry-api~=1.39.0,
+    # and every service uses the same versions so core/telemetry.py is one file.
+    "opentelemetry-sdk==1.39.1",
+    "opentelemetry-exporter-otlp-proto-grpc==1.39.1",
+    "opentelemetry-instrumentation-httpx==0.60b1",
+    "opentelemetry-instrumentation-fastapi==0.60b1",
 ]
 
 [dependency-groups]
