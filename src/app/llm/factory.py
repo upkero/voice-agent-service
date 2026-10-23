@@ -15,6 +15,7 @@ response service; it is the wrong one for a phone call.
 """
 
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from livekit.agents import llm
@@ -22,6 +23,7 @@ from livekit.plugins import openai
 
 from src.app.core.settings.llm import LLMSettings
 from src.app.exceptions.llm import LLMConfigurationError
+from src.app.llm.cost_tap import tap_openrouter_cost
 
 
 def create_llm(settings: LLMSettings) -> llm.LLM[Any]:
@@ -54,4 +56,11 @@ def create_llm(settings: LLMSettings) -> llm.LLM[Any]:
     if settings.reasoning_effort is not None:
         kwargs["reasoning_effort"] = settings.reasoning_effort
 
-    return openai.LLM(**kwargs)
+    openrouter = urlparse(settings.base_url or "").hostname == "openrouter.ai"
+    if openrouter:
+        # Asks OpenRouter to put the request's cost in the usage block.
+        kwargs["extra_body"] = {"usage": {"include": True}}
+    llm_client = openai.LLM(**kwargs)
+    if openrouter:
+        tap_openrouter_cost(llm_client, settings.model)
+    return llm_client
