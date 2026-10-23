@@ -27,6 +27,7 @@ from src.app.messages import degradation_message
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import BookingTools
 from src.app.voice.agent import BookingAgent
+from src.app.voice.call_stats import CallStats
 from src.app.voice.degradation import DegradationNotice
 from src.app.voice.greeting_audio import cached_greeting, replay
 
@@ -49,14 +50,16 @@ def native_turn_model_supported(cpuinfo: Path = Path("/proc/cpuinfo")) -> bool:
     return {"avx2", "fma"} <= flags
 
 
-def build_agent(container: ApplicationContainer, room_id: str) -> tuple[BookingAgent, DialogSessionState]:
+def build_agent(
+    container: ApplicationContainer, room_id: str, stats: CallStats | None = None
+) -> tuple[BookingAgent, DialogSessionState]:
     """One agent and one reference table per call.
 
     The state is per room and never shared: references issued to one guest must
     not resolve for another, and a process-wide table is how they would.
     """
     state = DialogSessionState(room_id)
-    tools = BookingTools(container.reservation_service, state, container.agent_settings)
+    tools = BookingTools(container.reservation_service, state, container.agent_settings, stats=stats)
     return BookingAgent(container.dialog_flow, tools), state
 
 

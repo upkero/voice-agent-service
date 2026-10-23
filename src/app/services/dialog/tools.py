@@ -24,7 +24,8 @@ import functools
 from collections.abc import Awaitable, Callable
 from datetime import date, time, timedelta
 from logging import getLogger
-from typing import Any, Final
+from time import perf_counter
+from typing import Any, Final, Protocol
 
 from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -46,6 +47,15 @@ _TIME_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"
 _SLOT_REF_PATTERN = r"^slot_[1-9]\d*$"
 _BOOKING_REF_PATTERN = r"^booking_[1-9]\d*$"
 _BOOKING_CODE_PATTERN = r"^\d{4}$"
+
+
+class ToolOutcomes(Protocol):
+    """Where a call's tool results are reported. Implemented by the voice layer,
+    which `services/` must not import."""
+
+    def on_tool(self, tool: str, result: dict[str, Any], seconds: float) -> None: ...
+
+    def note_guest(self, fingerprint: str) -> None: ...
 
 
 def _text(name: str) -> str:
@@ -226,7 +236,10 @@ def _traced(
     @functools.wraps(method)
     async def traced(self: "BookingTools", raw: dict[str, Any]) -> dict[str, Any]:
         with _tracer.start_as_current_span(name) as span:
+            started = perf_counter()
             result = await method(self, raw)
+            if self._stats:
+                self._stats.on_tool(method.__name__, result, perf_counter() - started)
             span.set_attribute("booking.result", "ok" if result["ok"] else result["reason"])
             for key in ("options", "bookings"):
                 if key in result:
@@ -251,10 +264,12 @@ class BookingTools:
         settings: AgentSettings,
         *,
         today: Callable[[], date] | None = None,
+        stats: ToolOutcomes | None = None,
     ) -> None:
         self._reservations = reservations
         self._state = state
         self._settings = settings
+        self._stats = stats
         # Injected so "is this date in the past" is testable without waiting
         # for tomorrow. By default the restaurant's date, not the server's.
         self._today = today or settings.today
@@ -417,7 +432,10 @@ class BookingTools:
             if value is not None:
                 span.set_attribute(attribute, value if isinstance(value, int | str) else value.isoformat())
         if guest_name := getattr(args, "guest_name", None):
-            span.set_attribute("booking.guest_name_fp", guest_name_fp(guest_name))
+            fingerprint = guest_name_fp(guest_name)
+            span.set_attribute("booking.guest_name_fp", fingerprint)
+            if self._stats:
+                self._stats.note_guest(fingerprint)
         return args
 
     def _failure(self, code: str) -> dict[str, Any]:

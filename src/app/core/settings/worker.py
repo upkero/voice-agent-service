@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class WorkerSettings(BaseSettings):
-    """How many calls the agent worker keeps ready, and how big one may grow.
+    """How many calls the agent worker keeps ready, how big one may grow, and where it is scraped.
 
     Each prewarmed process holds its own Whisper, Silero and turn model, about
     640 MB. livekit-agents defaults to one per CPU up to four, which on a 4-vCPU
@@ -22,6 +22,13 @@ class WorkerSettings(BaseSettings):
         default=1500,
         ge=0,
         description="A call whose process passes this is killed rather than starving the host. 0 disables it.",
+    )
+
+    prometheus_port: int = Field(
+        default=9464,
+        ge=0,
+        le=65535,
+        description="Port of the worker's /metrics endpoint, summed across job processes. 0 disables it.",
     )
 
     model_config = SettingsConfigDict(env_prefix="WORKER_", env_file=".env", extra="ignore")

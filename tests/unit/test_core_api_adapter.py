@@ -7,6 +7,7 @@ server.
 """
 
 from datetime import date
+from uuid import UUID
 
 import httpx
 import pytest
@@ -77,3 +78,28 @@ def test_the_factory_installs_the_request_id_hook() -> None:
     gateway = create_booking_gateway(SETTINGS)
 
     assert _inject_request_id in gateway._client.event_hooks["request"]  # noqa: SLF001
+
+
+async def test_every_attempt_is_timed_under_its_route_template_and_status_class() -> None:
+    from prometheus_client import REGISTRY
+
+    from src.app.exceptions.booking import BookingNotFoundError
+
+    def count(**labels: str) -> float:
+        return REGISTRY.get_sample_value("voice_ops_core_request_duration_seconds_count", labels) or 0.0
+
+    ok = {"method": "GET", "route": "/api/v1/booking-slots", "status_class": "2xx"}
+    gone = {"method": "DELETE", "route": "/api/v1/bookings/{id}", "status_class": "4xx"}
+    before = (count(**ok), count(**gone))
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.method == "DELETE":
+            return httpx.Response(404, json={"detail": "x", "error_code": "entity_not_found"})
+        return httpx.Response(200, json={"items": []})
+
+    repository = _repository(httpx.MockTransport(respond))
+    await repository.list_available_slots(date(2026, 7, 23), 2)
+    with pytest.raises(BookingNotFoundError):
+        await repository.cancel_booking(UUID(int=7))
+
+    assert (count(**ok), count(**gone)) == (before[0] + 1, before[1] + 1)

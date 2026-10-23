@@ -182,3 +182,29 @@ async def test_a_dead_voice_is_announced_mid_conversation_too() -> None:
     room = await _fire(recoverable=False, error_type=tts.TTSError)
 
     assert room.published == [(CHAT_TOPIC, degradation_message("en", "tts"))]
+
+
+async def test_an_announced_problem_is_counted_once_per_call() -> None:
+    from prometheus_client import REGISTRY
+
+    labels = {"kind": "stt"}
+    before = REGISTRY.get_sample_value("voice_degradation_notices_total", labels) or 0.0
+    notice = DegradationNotice(FakeRoom())
+
+    await notice.announce_once("stt", "x")
+    await notice.announce_once("stt", "x")
+
+    assert REGISTRY.get_sample_value("voice_degradation_notices_total", labels) == before + 1
+    assert notice.announced == ["stt"]
+
+
+def test_a_call_that_ends_unconfirmed_is_counted() -> None:
+    from prometheus_client import REGISTRY
+
+    before = REGISTRY.get_sample_value("voice_unconfirmed_bookings_total") or 0.0
+    state = DialogSessionState("room-1")
+    state._bookings["booking_1"] = _booking()  # noqa: SLF001
+
+    ConfirmationTracker(state).report("room-1")
+
+    assert REGISTRY.get_sample_value("voice_unconfirmed_bookings_total") == before + 1

@@ -14,6 +14,8 @@ technically published and practically invisible.
 from logging import getLogger
 from typing import Any, Protocol
 
+from src.app.core.metrics import DEGRADATION_NOTICES
+
 logger = getLogger(__name__)
 
 CHAT_TOPIC = "lk.chat"
@@ -65,9 +67,14 @@ class DegradationNotice:
         self._room = room
         self._announced: set[str] = set()
 
+    @property
+    def announced(self) -> list[str]:
+        return sorted(self._announced)
+
     async def announce_once(self, kind: str, text: str) -> None:
         if kind in self._announced:
             return
         self._announced.add(kind)
+        DEGRADATION_NOTICES.labels(kind).inc()
         logger.warning("Degraded: %s", kind, extra={"room": self._room.name, "degradation": kind})
         await announce(self._room, text)

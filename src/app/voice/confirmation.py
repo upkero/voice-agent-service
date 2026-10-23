@@ -14,6 +14,7 @@ the booking was taken.
 from logging import getLogger
 from typing import Any
 
+from src.app.core.metrics import UNCONFIRMED_BOOKINGS
 from src.app.services.dialog.session_state import DialogSessionState
 
 logger = getLogger(__name__)
@@ -52,6 +53,7 @@ class ConfirmationTracker:
                 extra={"room": room_name, "booking_refs": refs, "confirmation_spoken": True},
             )
             return
+        UNCONFIRMED_BOOKINGS.inc()
         # Deliberately not auto-cancelled. Releasing a table the guest agreed to
         # because one sentence went missing is the worse failure; a human can
         # settle this from the log with DELETE /api/v1/bookings/{id}.

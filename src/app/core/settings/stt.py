@@ -73,6 +73,15 @@ class STTSettings(BaseSettings):
     )
     timeout_seconds: float = Field(default=30.0, gt=0, description="Request timeout for the cloud provider.")
     max_retries: int = Field(default=2, ge=0, description="SDK-level retries for the cloud provider.")
+    deepgram_price_per_minute_usd: float = Field(
+        default=0.0,
+        ge=0,
+        description=(
+            "Deepgram's price per audio minute, for voice_cost_usd_total. The one static price in the "
+            "cost metrics: every other provider is billed through OpenRouter, which reports the exact "
+            "cost of each request. 0 records no STT spend."
+        ),
+    )
 
     model_config = SettingsConfigDict(env_prefix="STT_", env_file=".env", extra="ignore")
 

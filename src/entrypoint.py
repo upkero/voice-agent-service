@@ -26,6 +26,7 @@ from src.app.core.settings.stt import get_stt_settings
 from src.app.core.settings.tts import get_tts_settings
 from src.app.core.settings.worker import get_worker_settings
 from src.app.core.telemetry import setup_tracing
+from src.app.voice.call_stats import CallStats
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import DegradationNotice
 from src.app.voice.greeting_audio import prewarm_greetings_in_background
@@ -107,8 +108,11 @@ async def entrypoint(ctx: JobContext) -> None:
     call_settings = get_agent_settings().for_language(participant.attributes.get("language"))
     language = call_settings.language
 
+    stats = CallStats(
+        language, deepgram_price_per_minute_usd=get_stt_settings().deepgram_price_per_minute_usd
+    )
     container = ApplicationContainer(call_settings)
-    agent, state = build_agent(container, room_name)
+    agent, state = build_agent(container, room_name, stats)
     notice = DegradationNotice(ctx.room)
     tracker = ConfirmationTracker(state)
     session = build_session(language, vad=ctx.proc.userdata.get("vad"))
@@ -117,14 +121,24 @@ async def entrypoint(ctx: JobContext) -> None:
         tracker.report(room_name, reason)
         await session.aclose()
         await container.close()
+        stats.finish(
+            room=room_name,
+            job_id=ctx.job.id,
+            reason=reason,
+            degradations=notice.announced,
+            booking_refs=state.booking_refs(),
+            confirmation_spoken=tracker.confirmation_spoken,
+        )
         logger.info("Call ended", extra={"room": room_name, "reason": reason})
 
     ctx.add_shutdown_callback(on_shutdown)
 
     session.on("conversation_item_added", tracker.on_conversation_item)
+    stats.attach(session)
     register_degradation_notices(session, notice, language)
 
     await start_session(session, agent, ctx, notice, language)
+    stats.pipeline_started = True
     await greet(session, agent, notice, ctx.room, language)
     logger.info("Call started", extra={"room": room_name, "language": language})
 
@@ -146,6 +160,8 @@ if __name__ == "__main__":
         api_key=livekit_settings.api_key,
         api_secret=livekit_settings.api_secret.get_secret_value(),
     )
+    if worker_settings.prometheus_port:
+        options.prometheus_port = worker_settings.prometheus_port
     if not native_turn_model_supported():
         # The forkserver preloads livekit's native turn model, which crashes
         # without AVX2; spawn skips that preload.

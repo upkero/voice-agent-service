@@ -11,6 +11,7 @@ the in-memory fakes in the tests are the second implementation that proves it.
 from collections.abc import Sequence
 from datetime import date, time
 from logging import getLogger
+from time import perf_counter
 from typing import Any
 from uuid import UUID
 
@@ -18,6 +19,7 @@ import httpx
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
 from src.app.contracts.booking import BookingDTO, BookingStatus, SlotDTO
+from src.app.core.metrics import OPS_CORE_DURATION
 from src.app.core.request_id import get_request_id
 from src.app.core.resilience import retry_async
 from src.app.core.settings.core_api import CoreApiSettings
@@ -183,12 +185,18 @@ class CoreApiBookingGateway(BookingGateway):
         json: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
+        started, status_class = perf_counter(), "error"
         try:
             response = await self._client.request(method, path, params=params, json=json, headers=headers)
+            status_class = f"{response.status_code // 100}xx"
         except httpx.TimeoutException as exc:
             raise _TransientError(f"{method} {path} timed out") from exc
         except httpx.TransportError as exc:
             raise _TransientError(f"{method} {path} failed to connect: {exc}") from exc
+        finally:
+            # Per attempt, including the ones that never got an answer: a retry
+            # storm against a slow ops-core shows up here and nowhere else.
+            OPS_CORE_DURATION.labels(method, _route(path), status_class).observe(perf_counter() - started)
 
         if response.status_code >= 500 or response.status_code == httpx.codes.TOO_MANY_REQUESTS:
             # Server-side and possibly momentary. 429 joins them because it is
@@ -246,6 +254,11 @@ class CoreApiBookingGateway(BookingGateway):
             # about; failing here beats guessing that it means "active".
             status=BookingStatus(item["status"]),
         )
+
+
+def _route(path: str) -> str:
+    """The path's template: a booking id in a label is a series per booking."""
+    return "/api/v1/bookings/{id}" if path.startswith("/api/v1/bookings/") else path
 
 
 async def _inject_request_id(request: httpx.Request) -> None:
