@@ -36,6 +36,16 @@ async def test_offers_exclude_tables_that_are_too_small(
     assert [offer.slot.capacity for offer in offers] == [6]
 
 
+async def test_tables_sharing_a_time_are_offered_once_as_the_smallest_that_fits(state: DialogSessionState) -> None:
+    """Three free tables at 20:00 are one offer, not "eight, eight or eight"."""
+    slots = [make_slot(20, 0, 8), make_slot(20, 0, 4), make_slot(20, 0, 6), make_slot(18, 0, 4)]
+    service = ReservationService(FakeBookingGateway(slots), NearestTimeRanking(), CODE_KEY)
+
+    offers = await service.find_offers(state, TOMORROW, party_size=4, preferred_time=time(20, 0))
+
+    assert [(offer.slot.slot_time.hour, offer.slot.capacity) for offer in offers] == [(20, 4), (18, 4)]
+
+
 async def test_offers_are_capped(state: DialogSessionState) -> None:
     """A guest cannot hold a read-out list of six times in their head."""
     many = [make_slot(hour, 0, 6) for hour in range(12, 22)]

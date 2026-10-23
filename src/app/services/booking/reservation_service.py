@@ -12,7 +12,7 @@ from hashlib import sha256
 from logging import getLogger
 from uuid import UUID
 
-from src.app.contracts.booking import BookingStatus, BookingSummary, SlotOffer
+from src.app.contracts.booking import BookingStatus, BookingSummary, SlotDTO, SlotOffer
 from src.app.exceptions.booking import IdempotencyKeyConsumedError, InactiveBookingError, WrongBookingCodeError
 from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
 from src.app.interfaces.booking_gateway import BookingGateway
@@ -47,7 +47,13 @@ class ReservationService:
         that answers "no" to 19:00 when 19:30 is free is worse than useless.
         """
         slots = await self._bookings.list_available_slots(booking_date, party_size)
-        ranked = self._ranking.rank(slots, preferred_time)
+        # Several tables can be free at one time, and the guest picks a time,
+        # not a table: keep the smallest table that fits at each time, so the
+        # three offers are three times and a couple doesn't take the eight-seater.
+        smallest: dict[time, SlotDTO] = {}
+        for slot in sorted(slots, key=lambda slot: slot.capacity):
+            smallest.setdefault(slot.slot_time, slot)
+        ranked = self._ranking.rank(list(smallest.values()), preferred_time)
         return state.offer_slots(ranked[:MAX_OFFERS])
 
     async def reserve(

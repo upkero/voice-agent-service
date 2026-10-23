@@ -29,7 +29,7 @@ def make_slot(hour: int = 19, minute: int = 30, capacity: int = 6, slot_date: da
 
 
 def seeded_slots(slot_date: date = TOMORROW) -> list[SlotDTO]:
-    """The table slots ops-core-api actually seeds: 12:00, 13:30, 18:00, 19:30."""
+    """A small diary of single tables: 12:00, 13:30, 18:00, 19:30."""
     return [
         make_slot(12, 0, 2, slot_date),
         make_slot(13, 30, 4, slot_date),
