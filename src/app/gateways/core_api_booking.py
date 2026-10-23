@@ -39,8 +39,9 @@ logger = getLogger(__name__)
 # front door.
 _RESOURCE_TYPE = "table"
 
-# One date holds a handful of slots, so a single page always covers it. Asking
+# One date holds a handful of slots, so a single page always covers them. Asking
 # for more than exists costs nothing; paging through a conversation would.
+# Bookings on a date are not so bounded, so those are paged (list_active_bookings).
 _SLOT_PAGE_SIZE = 100
 
 # error_code -> our exception. Switching on the code rather than the status is
@@ -108,18 +109,25 @@ class CoreApiBookingGateway(BookingGateway):
         )
         return self._to_booking(payload)
 
-    async def find_bookings(self, guest_name: str, slot_date: date) -> Sequence[BookingDTO]:
-        payload = await self._send(
-            "GET",
-            "/api/v1/bookings",
-            params={
-                "guest_name": guest_name,
-                "date": slot_date.isoformat(),
-                "status": BookingStatus.ACTIVE.value,
-                "limit": _SLOT_PAGE_SIZE,
-            },
-        )
-        return [self._to_booking(item) for item in payload.get("items", [])]
+    async def list_active_bookings(self, slot_date: date) -> Sequence[BookingDTO]:
+        bookings: list[BookingDTO] = []
+        while True:
+            payload = await self._send(
+                "GET",
+                "/api/v1/bookings",
+                params={
+                    "date": slot_date.isoformat(),
+                    "status": BookingStatus.ACTIVE.value,
+                    "limit": _SLOT_PAGE_SIZE,
+                    "offset": len(bookings),
+                },
+            )
+            page = payload.get("items", [])
+            bookings.extend(self._to_booking(item) for item in page)
+            # An empty page ends the loop even if `total` over-promises, so a
+            # misbehaving upstream cannot hold the call open.
+            if not page or len(bookings) >= int(payload.get("total", 0)):
+                return bookings
 
     async def cancel_booking(self, booking_id: UUID) -> BookingDTO:
         # No Idempotency-Key: DELETE is idempotent server-side, so a retry after

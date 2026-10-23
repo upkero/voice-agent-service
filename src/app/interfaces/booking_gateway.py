@@ -44,8 +44,13 @@ class BookingGateway(ABC):
         """
 
     @abstractmethod
-    async def find_bookings(self, guest_name: str, slot_date: date) -> Sequence[BookingDTO]:
-        """Active bookings under that name on that date."""
+    async def list_active_bookings(self, slot_date: date) -> Sequence[BookingDTO]:
+        """Every active booking on that date, across all pages.
+
+        No name filter: the name a guest says now and the one stored were each
+        heard by speech recognition, so only the caller can match them
+        tolerantly. The caller must not pass the other guests' bookings on.
+        """
 
     @abstractmethod
     async def cancel_booking(self, booking_id: UUID) -> BookingDTO:

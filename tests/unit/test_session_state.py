@@ -44,7 +44,7 @@ async def test_a_booking_made_in_this_call_is_cancellable_without_a_lookup(
     result = await tools.cancel_booking({"booking_ref": "booking_1", "confirmed": True})
 
     assert result["ok"] is True
-    assert "find_bookings" not in repository.calls
+    assert "list_active_bookings" not in repository.calls
 
 
 async def test_an_unissued_slot_reference_raises_before_any_call(

@@ -16,6 +16,7 @@ from src.app.contracts.booking import BookingStatus, BookingSummary, SlotOffer
 from src.app.exceptions.booking import IdempotencyKeyConsumedError, InactiveBookingError, WrongBookingCodeError
 from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
 from src.app.interfaces.booking_gateway import BookingGateway
+from src.app.services.booking.name_match import names_match
 from src.app.services.dialog.session_state import DialogSessionState
 
 logger = getLogger(__name__)
@@ -114,10 +115,17 @@ class ReservationService:
         endpoint reveals who is dining where, and an agent that will list the
         evening's guests to anyone who asks is a data leak wearing a feature's
         clothes.
+
+        The name is matched here, not by ops-core-api: both the stored name and
+        this one were heard by speech recognition on different calls, and a
+        substring match fails on a Russian case ending. That means the whole
+        day's bookings are fetched, which is why only the ones that match are
+        ever returned, registered in the session or logged.
         """
         if code is not None:
             state.spend_code_attempt()
-        bookings = await self._bookings.find_bookings(guest_name, booking_date)
+        on_the_day = await self._bookings.list_active_bookings(booking_date)
+        bookings = [b for b in on_the_day if names_match(guest_name, b.guest_name)]
         if code is not None and bookings:
             # compare_digest: a code check should not leak through its timing.
             bookings = [b for b in bookings if hmac.compare_digest(self.booking_code(b.id), code)]

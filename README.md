@@ -254,6 +254,8 @@ code checks for that call. The code is not stored anywhere: it is an HMAC of the
 with `OPS_CORE_API_KEY`, so it works for every booking with no ops-core change, and rotating that
 key changes every code.
 
+**An earlier booking is found by date, and the name is matched here.** Two calls hear the same name two ways ("Андрей" stored, "Андрея" said; a letter off), which a substring query to ops-core cannot absorb. So `find_booking` asks ops-core for the day's active bookings (all pages), compares names in `services/booking/name_match.py` (case endings stripped, one letter of drift tolerated; the threshold is `NAME_SIMILARITY_THRESHOLD`), and hands the model only the bookings that match. When none does, Мила reads back the date she searched and asks the guest to confirm or correct it; she never tries other dates by herself.
+
 **All model-facing text lives in `prompts/`.** The system prompt's five sections and every tool
 `description` are Markdown files loaded at import, in English, with the reply language as a
 `{reply_language}` placeholder rather than a translated copy — a translated prompt forks on the

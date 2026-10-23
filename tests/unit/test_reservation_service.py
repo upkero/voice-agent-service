@@ -1,8 +1,13 @@
 from datetime import date, time
+from unittest.mock import patch
+from uuid import uuid4
 
+import httpx
 import pytest
 
-from src.app.exceptions.booking import CoreUnavailableError
+from src.app.core.settings.core_api import CoreApiSettings
+from src.app.exceptions.booking import CoreUnavailableError, WrongBookingCodeError
+from src.app.gateways.core_api_booking import CoreApiBookingGateway
 from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import MAX_OFFERS, ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
@@ -110,3 +115,94 @@ async def test_seeded_slots_match_ops_core_api() -> None:
     """Guards the fixture itself against drifting from the real seed data."""
     assert [slot.slot_time.strftime("%H:%M") for slot in seeded_slots()] == ["12:00", "13:30", "18:00", "19:30"]
     assert [slot.capacity for slot in seeded_slots()] == [2, 4, 4, 6]
+
+
+async def _book(reservations: ReservationService, name: str) -> None:
+    session = DialogSessionState(f"call-{name}")
+    offers = await reservations.find_offers(session, TOMORROW, party_size=2, preferred_time=None)
+    await reservations.reserve(session, offers[0].ref, name, 2)
+
+
+async def test_find_existing_returns_only_the_matching_booking_of_a_busy_date(
+    reservations: ReservationService,
+) -> None:
+    """The whole day is fetched to match the name, but no other guest may come out of it."""
+    for name in ("Андрей Иванов", "Алексей Петров", "Мария Сидорова"):
+        await _book(reservations, name)
+
+    found = await reservations.find_existing(DialogSessionState("later-call"), "Андрея", TOMORROW)
+
+    assert [booking.guest_name for booking in found] == ["Андрей Иванов"]
+
+
+async def test_find_existing_survives_the_name_drift_between_calls(reservations: ReservationService) -> None:
+    await _book(reservations, "Мария")
+
+    found = await reservations.find_existing(DialogSessionState("later-call"), "Марии", TOMORROW)
+
+    assert [booking.guest_name for booking in found] == ["Мария"]
+
+
+async def test_find_existing_with_no_match_returns_nothing_and_keeps_other_dates_out(
+    reservations: ReservationService, repository: FakeBookingGateway
+) -> None:
+    await _book(reservations, "Алексей")
+
+    found = await reservations.find_existing(DialogSessionState("later-call"), "Андрей", TOMORROW)
+
+    assert found == []
+    # One lookup, for the date that was asked: a miss does not widen the search.
+    assert repository.calls.count("list_active_bookings") == 1
+
+
+async def test_the_booking_code_still_cancels_after_a_fuzzy_match(
+    reservations: ReservationService, repository: FakeBookingGateway
+) -> None:
+    await _book(reservations, "Андрей")
+    code = reservations.booking_code(next(iter(repository.bookings)))
+
+    later = DialogSessionState("later-call")
+    found = await reservations.find_existing(later, "Андрея", TOMORROW, code)
+
+    assert len(found) == 1
+    assert (await reservations.cancel(later, found[0].ref)).guest_name == "Андрей"
+
+
+async def test_a_wrong_code_is_still_refused_for_a_fuzzy_match(
+    reservations: ReservationService, repository: FakeBookingGateway
+) -> None:
+    await _book(reservations, "Андрей")
+    code = reservations.booking_code(next(iter(repository.bookings)))
+    wrong = f"{(int(code) + 1) % 10_000:04d}"
+
+    with pytest.raises(WrongBookingCodeError):
+        await reservations.find_existing(DialogSessionState("later-call"), "Андрея", TOMORROW, wrong)
+
+
+async def test_every_page_of_the_day_is_searched() -> None:
+    """The match is made here, so a booking on the last page must still be found."""
+    ids = [uuid4() for _ in range(5)]
+    seen_offsets: list[int] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        assert "guest_name" not in request.url.params
+        offset = int(request.url.params["offset"])
+        seen_offsets.append(offset)
+        items = [
+            {"id": str(ids[i]), "guest_name": f"Гость {i}" if i != 4 else "Андрей", "slot_id": str(uuid4()),
+             "party_size": 2, "status": "active"}
+            for i in range(offset, min(offset + 2, 5))
+        ]  # fmt: skip
+        return httpx.Response(200, json={"items": items, "total": 5, "limit": 2, "offset": offset})
+
+    gateway = CoreApiBookingGateway(
+        CoreApiSettings(api_key="test-key-1234567890"),
+        httpx.AsyncClient(transport=httpx.MockTransport(respond), base_url="http://core.test"),
+    )
+    service = ReservationService(gateway, NearestTimeRanking(), CODE_KEY)
+
+    with patch("src.app.gateways.core_api_booking._SLOT_PAGE_SIZE", 2):
+        found = await service.find_existing(DialogSessionState("later-call"), "Андрея", TOMORROW)
+
+    assert seen_offsets == [0, 2, 4]
+    assert [booking.guest_name for booking in found] == ["Андрей"]

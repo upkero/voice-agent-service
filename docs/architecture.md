@@ -46,7 +46,7 @@ for somebody else's service over the network; `repositories/` would be for a dat
 service has none.
 
 The `BookingGateway` port is nonetheless shaped exactly like a database repository would be —
-`list_available_slots`, `create_booking`, `find_bookings`, `cancel_booking`, returning contracts
+`list_available_slots`, `create_booking`, `list_active_bookings`, `cancel_booking`, returning contracts
 and raising typed exceptions. That shape is the point: the services above it cannot tell whether
 a slot came from a SQL row or a JSON response, and the in-memory fakes in the tests are the
 second implementation that proves it.

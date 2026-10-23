@@ -89,14 +89,12 @@ class FakeBookingGateway(BookingGateway):
         self.taken.add(slot_id)
         return booking
 
-    async def find_bookings(self, guest_name: str, slot_date: date) -> Sequence[BookingDTO]:
-        self.calls.append("find_bookings")
+    async def list_active_bookings(self, slot_date: date) -> Sequence[BookingDTO]:
+        self.calls.append("list_active_bookings")
         return [
             booking
             for booking in self.bookings.values()
-            if booking.status is BookingStatus.ACTIVE
-            and guest_name.lower() in booking.guest_name.lower()
-            and self.slots[booking.slot_id].slot_date == slot_date
+            if booking.status is BookingStatus.ACTIVE and self.slots[booking.slot_id].slot_date == slot_date
         ]
 
     async def cancel_booking(self, booking_id: UUID) -> BookingDTO:
@@ -135,7 +133,7 @@ class UnavailableBookingGateway(BookingGateway):
     ) -> BookingDTO:
         raise CoreUnavailableError()
 
-    async def find_bookings(self, guest_name: str, slot_date: date) -> Sequence[BookingDTO]:
+    async def list_active_bookings(self, slot_date: date) -> Sequence[BookingDTO]:
         raise CoreUnavailableError()
 
     async def cancel_booking(self, booking_id: UUID) -> BookingDTO:
