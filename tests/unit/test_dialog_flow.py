@@ -96,9 +96,7 @@ def test_an_english_call_uses_the_latin_name_and_says_it_in_the_greeting() -> No
 
     assert "Mila" in flow.system_prompt()
     assert "Мила" not in flow.system_prompt()
-    assert flow.greeting_text() == (
-        "Hello, I'm Mila from Aurora. Which date would you like to book, and for how many people?"
-    )
+    assert flow.greeting_text() == "Hello, Aurora restaurant, this is Mila. How can I help?"
 
 
 def test_a_russian_call_keeps_the_cyrillic_name() -> None:
@@ -107,7 +105,7 @@ def test_a_russian_call_keeps_the_cyrillic_name() -> None:
         today=lambda: TODAY,
     )
 
-    assert flow.greeting_text().startswith("Здравствуйте, я Мила из Aurora.")
+    assert flow.greeting_text() == "Здравствуйте, ресторан Aurora, меня зовут Мила. Слушаю вас."
 
 
 def test_a_subclass_can_replace_a_step_without_reordering_the_skeleton() -> None:
