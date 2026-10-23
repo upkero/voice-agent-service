@@ -1,7 +1,9 @@
+from datetime import date, datetime
 from functools import lru_cache
 from typing import Literal, get_args
+from zoneinfo import ZoneInfo
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AgentLanguage = Literal["ru", "en"]
@@ -56,7 +58,28 @@ class AgentSettings(BaseSettings):
         description="Longest a guest waits on one booking tool, retries included, before hearing it is unavailable.",
     )
 
+    timezone: str = Field(
+        default="Europe/Moscow",
+        description=(
+            "IANA zone of the restaurant: what 'today' means on a call. Keep it equal to ops-core-api's "
+            "BUSINESS_TIMEZONE. The server clock is UTC, so without it 'today' is wrong for three hours a night."
+        ),
+    )
+
     model_config = SettingsConfigDict(env_prefix="AGENT_", env_file=".env", extra="ignore")
+
+    @field_validator("timezone")
+    @classmethod
+    def known_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (KeyError, ValueError) as exc:
+            raise ValueError(f"unknown timezone {value!r}") from exc
+        return value
+
+    def today(self) -> date:
+        """The restaurant's date right now, not the server's."""
+        return datetime.now(ZoneInfo(self.timezone)).date()
 
     @property
     def display_name(self) -> str:

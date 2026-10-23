@@ -25,9 +25,9 @@ from src.app.prompts import get_prompt
 
 
 class BaseDialogFlow(ABC):
-    def __init__(self, settings: AgentSettings, *, today: Callable[[], date] = date.today) -> None:
+    def __init__(self, settings: AgentSettings, *, today: Callable[[], date] | None = None) -> None:
         self._settings = settings
-        self._today = today
+        self._today = today or settings.today
 
     @property
     def settings(self) -> AgentSettings:

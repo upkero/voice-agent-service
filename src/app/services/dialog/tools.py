@@ -250,14 +250,14 @@ class BookingTools:
         state: DialogSessionState,
         settings: AgentSettings,
         *,
-        today: Callable[[], date] = date.today,
+        today: Callable[[], date] | None = None,
     ) -> None:
         self._reservations = reservations
         self._state = state
         self._settings = settings
         # Injected so "is this date in the past" is testable without waiting
-        # for tomorrow.
-        self._today = today
+        # for tomorrow. By default the restaurant's date, not the server's.
+        self._today = today or settings.today
 
     @property
     def language(self) -> str:
