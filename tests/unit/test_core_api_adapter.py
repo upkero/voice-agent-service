@@ -103,3 +103,16 @@ async def test_every_attempt_is_timed_under_its_route_template_and_status_class(
         await repository.cancel_booking(UUID(int=7))
 
     assert (count(**ok), count(**gone)) == (before[0] + 1, before[1] + 1)
+
+
+async def test_a_retry_against_ops_core_is_counted_with_its_reason() -> None:
+    from tests import telemetry
+
+    labels = {"target": "ops_core", "reason": "5xx"}
+    before = telemetry.reading("upstream.retries", **labels)
+    repository = _repository(httpx.MockTransport(lambda _: httpx.Response(503)))
+
+    with pytest.raises(CoreUnavailableError):
+        await repository.list_available_slots(date(2026, 7, 23), 2)
+
+    assert telemetry.reading("upstream.retries", **labels) == before + SETTINGS.max_attempts - 1

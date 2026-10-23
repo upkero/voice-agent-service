@@ -81,7 +81,9 @@ class CoreApiBookingGateway(BookingGateway):
         self._client = client
         # Bind the retry policy once, from settings, rather than decorating the
         # method at import time with a hard-coded attempt count.
-        self._retrying_send = retry_async(attempts=settings.max_attempts, retry_on=_TransientError)(self._send_once)
+        self._retrying_send = retry_async(
+            attempts=settings.max_attempts, retry_on=_TransientError, target="ops_core"
+        )(self._send_once)
 
     async def list_available_slots(self, slot_date: date, party_size: int) -> Sequence[SlotDTO]:
         payload = await self._send(
