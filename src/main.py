@@ -22,6 +22,7 @@ from src.app.bootstrap.container import ApplicationContainer
 from src.app.core.logging import setup_logging
 from src.app.core.settings.app import get_app_settings
 from src.app.core.settings.logging import get_logging_settings
+from src.app.core.telemetry import instrument_app, setup_tracing
 
 
 @asynccontextmanager
@@ -39,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     setup_logging(get_logging_settings())
+    setup_tracing("voice-api", "voice-agent-service")
 
     app = FastAPI(
         title="Voice Agent Service",
@@ -71,6 +73,7 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(app)
+    instrument_app(app)
 
     app.include_router(health_router)
     app.include_router(api_router)

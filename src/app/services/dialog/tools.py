@@ -20,15 +20,18 @@ which a guest reads as the line having dropped.
 """
 
 import asyncio
+import functools
 from collections.abc import Awaitable, Callable
 from datetime import date, time, timedelta
 from logging import getLogger
 from typing import Any, Final
 
+from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from src.app.contracts.booking import BookingSummary, SlotOffer
 from src.app.core.settings.agent import AgentSettings
+from src.app.core.telemetry import guest_name_fp
 from src.app.exceptions.booking import BookingError
 from src.app.messages import phrase
 from src.app.prompts import get_prompt
@@ -36,6 +39,7 @@ from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
 
 logger = getLogger(__name__)
+_tracer = trace.get_tracer(__name__)
 
 _DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 _TIME_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"
@@ -194,6 +198,43 @@ TOOL_SCHEMAS: Final[tuple[dict[str, Any], ...]] = (
     CANCEL_BOOKING_SCHEMA,
 )
 
+# Validated argument -> span attribute. booking_code is absent on purpose: it is
+# the one secret a guest proves a booking with, and a trace is not the place for
+# it. The guest name is present in plaintext, and only here: traces are the one
+# store with short retention behind an SSH tunnel, and "which name did STT hear"
+# is the question a failed lookup asks.
+_SPAN_ATTRIBUTES: Final[dict[str, str]] = {
+    "booking_date": "booking.date",
+    "party_size": "booking.party_size",
+    "preferred_time": "booking.preferred_time",
+    "slot_ref": "booking.slot_ref",
+    "booking_ref": "booking.ref",
+    "guest_name": "booking.guest_name",
+}
+
+
+def _traced(
+    method: Callable[["BookingTools", dict[str, Any]], Awaitable[dict[str, Any]]],
+) -> Callable[["BookingTools", dict[str, Any]], Awaitable[dict[str, Any]]]:
+    """A `booking.<tool>` span under the framework's function_tool span.
+
+    Ours, because function_tool only knows the raw arguments and the rendered
+    output; the result code and the ops-core call are what an incident needs.
+    """
+    name = f"booking.{method.__name__}"
+
+    @functools.wraps(method)
+    async def traced(self: "BookingTools", raw: dict[str, Any]) -> dict[str, Any]:
+        with _tracer.start_as_current_span(name) as span:
+            result = await method(self, raw)
+            span.set_attribute("booking.result", "ok" if result["ok"] else result["reason"])
+            for key in ("options", "bookings"):
+                if key in result:
+                    span.set_attribute("booking.results.count", len(result[key]))
+            return result
+
+    return traced
+
 
 class BookingTools:
     """Dispatches validated tool calls and phrases every failure.
@@ -222,6 +263,7 @@ class BookingTools:
     def language(self) -> str:
         return self._settings.language
 
+    @_traced
     async def check_availability(self, raw: dict[str, Any]) -> dict[str, Any]:
         args = self._parse(CheckAvailabilityArgs, raw)
         if args is None:
@@ -246,6 +288,7 @@ class BookingTools:
 
         return await self._guarded(run)
 
+    @_traced
     async def create_booking(self, raw: dict[str, Any]) -> dict[str, Any]:
         args = self._parse(CreateBookingArgs, raw)
         if args is None:
@@ -267,6 +310,7 @@ class BookingTools:
 
         return await self._guarded(run)
 
+    @_traced
     async def find_booking(self, raw: dict[str, Any]) -> dict[str, Any]:
         args = self._parse(FindBookingArgs, raw)
         if args is None:
@@ -282,6 +326,7 @@ class BookingTools:
 
         return await self._guarded(run)
 
+    @_traced
     async def cancel_booking(self, raw: dict[str, Any]) -> dict[str, Any]:
         args = self._parse(CancelBookingArgs, raw)
         if args is None:
@@ -347,7 +392,7 @@ class BookingTools:
 
     def _parse(self, model: type[BaseModel], raw: dict[str, Any]) -> Any:
         try:
-            return model.model_validate(raw)
+            args = model.model_validate(raw)
         except ValidationError as exc:
             logger.warning(
                 "Rejected tool arguments for %s: %s",
@@ -361,6 +406,14 @@ class BookingTools:
                 },
             )
             return None
+        span = trace.get_current_span()
+        for field, attribute in _SPAN_ATTRIBUTES.items():
+            value = getattr(args, field, None)
+            if value is not None:
+                span.set_attribute(attribute, value if isinstance(value, int | str) else value.isoformat())
+        if guest_name := getattr(args, "guest_name", None):
+            span.set_attribute("booking.guest_name_fp", guest_name_fp(guest_name))
+        return args
 
     def _failure(self, code: str) -> dict[str, Any]:
         return {"ok": False, "reason": code, "say": phrase(self.language, code)}

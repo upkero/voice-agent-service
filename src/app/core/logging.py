@@ -4,6 +4,8 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
+from opentelemetry import trace
+
 from src.app.core.request_id import get_request_id
 from src.app.core.settings.logging import LoggingSettings
 
@@ -37,6 +39,11 @@ class _JsonFormatter(logging.Formatter):
 class _RequestIdFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = get_request_id() or "-"
+        # The join key from a log line to its trace. Empty outside a span, so
+        # the field is always present and a query never has to test for it.
+        context = trace.get_current_span().get_span_context()
+        record.trace_id = format(context.trace_id, "032x") if context.is_valid else ""
+        record.span_id = format(context.span_id, "016x") if context.is_valid else ""
         return True
 
 

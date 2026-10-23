@@ -15,6 +15,7 @@ from typing import Any
 from uuid import UUID
 
 import httpx
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
 from src.app.contracts.booking import BookingDTO, BookingStatus, SlotDTO
 from src.app.core.request_id import get_request_id
@@ -259,12 +260,23 @@ async def _inject_request_id(request: httpx.Request) -> None:
         request.headers["X-Request-ID"] = request_id
 
 
-def create_booking_gateway(settings: CoreApiSettings) -> CoreApiBookingGateway:
-    """Factory: the one place the HTTP client for ops-core-api is built."""
+def create_booking_gateway(
+    settings: CoreApiSettings, transport: httpx.AsyncBaseTransport | None = None
+) -> CoreApiBookingGateway:
+    """Factory: the one place the HTTP client for ops-core-api is built.
+
+    `transport` lets a test run the real client, hooks and instrumentation
+    included, against a stub instead of a server.
+    """
     client = httpx.AsyncClient(
         base_url=settings.base_url,
+        transport=transport,
         timeout=settings.timeout_seconds,
         headers={"X-API-Key": settings.api_key.get_secret_value()},
         event_hooks={"request": [_inject_request_id]},
     )
+    # A client span per request and a `traceparent` header, so ops-core-api's
+    # server span becomes a child of the booking tool that called it. The
+    # X-Request-ID hook stays: logs join on it, and not every log has a trace.
+    HTTPXClientInstrumentor().instrument_client(client)
     return CoreApiBookingGateway(settings, client)

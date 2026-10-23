@@ -12,8 +12,9 @@ concurrency, and neither is a trade worth making.
 
 from logging import getLogger
 
-from livekit.agents import JobContext, JobProcess, WorkerOptions, cli
+from livekit.agents import JobContext, JobProcess, WorkerOptions, cli, telemetry
 from livekit.plugins import silero
+from opentelemetry import trace
 
 from src.app.bootstrap.container import ApplicationContainer
 from src.app.core.logging import setup_logging
@@ -24,6 +25,7 @@ from src.app.core.settings.logging import get_logging_settings
 from src.app.core.settings.stt import get_stt_settings
 from src.app.core.settings.tts import get_tts_settings
 from src.app.core.settings.worker import get_worker_settings
+from src.app.core.telemetry import setup_tracing
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import DegradationNotice
 from src.app.voice.greeting_audio import prewarm_greetings_in_background
@@ -47,6 +49,13 @@ def prewarm(proc: JobProcess) -> None:
     one costs the guest seconds of silence.
     """
     setup_logging(get_logging_settings())
+    # Here, not at import: under forkserver an import-time provider would be
+    # built in the parent and its export thread would not survive the fork. Not
+    # in entrypoint either: by then the framework's job_entrypoint span has
+    # started on a no-op tracer. livekit gets the provider too, because its
+    # shutdown flushes only the one it holds; otherwise a call's last spans die
+    # with its process.
+    telemetry.set_tracer_provider(setup_tracing("voice-agent", "voice-agent-service"))
     proc.userdata["vad"] = silero.VAD.load()
     stt_settings = get_stt_settings()
     if "faster_whisper" in (stt_settings.provider, stt_settings.fallback_provider):
@@ -59,6 +68,25 @@ def prewarm(proc: JobProcess) -> None:
     logger.info("Worker prewarmed", extra={"language": get_agent_settings().language})
 
 
+def bind_call(room_name: str) -> None:
+    """Stamp this process's logs, outbound requests and spans with the call.
+
+    No HTTP request wraps a job, so the ContextVar the outbound client reads
+    is empty and every call this worker makes to ops-core-api would arrive
+    uncorrelated — half this service's traffic. The room name is the natural
+    key: it is already in every log line on this side, and one call is one
+    room, so it joins the two sides of a booking without inventing an id
+    nobody can look up. A process serves one job, so the span metadata never
+    leaks into another call.
+    """
+    request_id = f"room-{room_name}"
+    set_request_id(request_id)
+    telemetry.set_tracer_provider(
+        trace.get_tracer_provider(),
+        metadata={"request_id": request_id, "lk.room_name": room_name},
+    )
+
+
 async def entrypoint(ctx: JobContext) -> None:
     """Handle one call.
 
@@ -68,13 +96,7 @@ async def entrypoint(ctx: JobContext) -> None:
     reason.
     """
     room_name = ctx.room.name
-    # No HTTP request wraps a job, so the ContextVar the outbound client reads
-    # is empty and every call this worker makes to ops-core-api would arrive
-    # uncorrelated — half this service's traffic. The room name is the natural
-    # key: it is already in every log line on this side, and one call is one
-    # room, so it joins the two sides of a booking without inventing an id
-    # nobody can look up.
-    set_request_id(f"room-{room_name}")
+    bind_call(room_name)
 
     # The language is a property of the call, not of the process: the token the
     # guest joined with carries it as a participant attribute. So the room has to
