@@ -212,10 +212,14 @@ async def test_a_hanging_backend_is_cut_off_and_phrased(
     assert result["say"] == phrase("en", "core_unavailable")
 
 
-async def test_every_language_has_a_filler_line() -> None:
-    from src.app.messages import ERROR_PHRASES, filler_line
+async def test_every_language_has_a_filler_line_for_every_tool() -> None:
+    from src.app.messages import ERROR_PHRASES, FILLERS, filler_line
+    from src.app.services.dialog.tools import TOOL_SCHEMAS
 
-    assert all(filler_line(language).strip() for language in ERROR_PHRASES)
+    for language in ERROR_PHRASES:
+        for schema in TOOL_SCHEMAS:
+            assert filler_line(language, schema["name"]).strip()
+            assert all(line.strip() for line in FILLERS[language][schema["name"]])
 
 
 async def test_the_booking_code_round_trips_through_the_tools(

@@ -16,6 +16,7 @@ steps genuinely differ between flows; the wording differs only by language, and
 a class per locale would be ceremony around a dictionary.
 """
 
+import random
 from typing import Final
 
 _FALLBACK_LANGUAGE = "en"
@@ -112,9 +113,29 @@ GREETINGS: Final[dict[str, str]] = {
 
 
 # Spoken the moment a booking tool starts, so the wait for ops-core is not dead air.
-FILLERS: Final[dict[str, str]] = {
-    "ru": "Секунду, проверяю.",
-    "en": "One moment, let me check.",
+# Per tool, because "let me check" before a cancellation sounds like a script; and
+# a few variants each, because the same line twice in one call sounds like one too.
+FILLERS: Final[dict[str, dict[str, tuple[str, ...]]]] = {
+    "ru": {
+        "check_availability": (
+            "Секунду, смотрю свободные столики.",
+            "Сейчас посмотрю, что есть на это время.",
+            "Минутку, проверяю наличие мест.",
+        ),
+        "create_booking": ("Бронирую, одну секунду.", "Оформляю бронь, минутку.", "Секунду, записываю вас."),
+        "find_booking": ("Сейчас найду вашу бронь.", "Секунду, ищу бронь.", "Минутку, смотрю бронирования."),
+        "cancel_booking": ("Отменяю, одну секунду.", "Секунду, снимаю бронь.", "Сейчас отменю."),
+    },
+    "en": {
+        "check_availability": (
+            "One moment, let me see what's free.",
+            "Let me check that time for you.",
+            "Just a second, checking the tables.",
+        ),
+        "create_booking": ("Booking that now, one moment.", "Just a second, I'm writing you in."),
+        "find_booking": ("Let me find your booking.", "One moment, looking it up."),
+        "cancel_booking": ("Cancelling that now, one moment.", "Just a second, I'll cancel it."),
+    },
 }
 
 
@@ -134,8 +155,9 @@ def stt_vocabulary(language: str) -> str:
     return STT_VOCABULARY.get(language) or STT_VOCABULARY[_FALLBACK_LANGUAGE]
 
 
-def filler_line(language: str) -> str:
-    return FILLERS.get(language) or FILLERS[_FALLBACK_LANGUAGE]
+def filler_line(language: str, tool: str) -> str:
+    table = FILLERS.get(language) or FILLERS[_FALLBACK_LANGUAGE]
+    return random.choice(table[tool])
 
 
 def greeting_line(language: str, agent_name: str, venue_name: str) -> str:
