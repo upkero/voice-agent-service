@@ -23,6 +23,7 @@ from src.app.core.settings.livekit import get_livekit_settings
 from src.app.core.settings.logging import get_logging_settings
 from src.app.core.settings.stt import get_stt_settings
 from src.app.core.settings.tts import get_tts_settings
+from src.app.core.settings.worker import get_worker_settings
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import DegradationNotice
 from src.app.voice.greeting_audio import prewarm_greetings_in_background
@@ -108,6 +109,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
 if __name__ == "__main__":
     livekit_settings = get_livekit_settings()
+    worker_settings = get_worker_settings()
     options = WorkerOptions(
         entrypoint_fnc=entrypoint,
         prewarm_fnc=prewarm,
@@ -116,6 +118,8 @@ if __name__ == "__main__":
         # Past it, livekit-agents kills the process with SIGUSR1, which is
         # logged as "process exited with non-zero exit code -10".
         initialize_process_timeout=60.0,
+        num_idle_processes=worker_settings.num_idle_processes,
+        job_memory_limit_mb=worker_settings.job_memory_limit_mb,
         ws_url=livekit_settings.url,
         api_key=livekit_settings.api_key,
         api_secret=livekit_settings.api_secret.get_secret_value(),
