@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from src.app.core.settings.core_api import CoreApiSettings
-from src.app.exceptions.booking import CoreUnavailableError, WrongBookingCodeError
+from src.app.exceptions.booking import CoreUnavailableError, SlotCapacityError, WrongBookingCodeError
 from src.app.gateways.core_api_booking import CoreApiBookingGateway
 from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import MAX_OFFERS, ReservationService
@@ -44,6 +44,40 @@ async def test_tables_sharing_a_time_are_offered_once_as_the_smallest_that_fits(
     offers = await service.find_offers(state, TOMORROW, party_size=4, preferred_time=time(20, 0))
 
     assert [(offer.slot.slot_time.hour, offer.slot.capacity) for offer in offers] == [(20, 4), (18, 4)]
+
+
+async def test_with_no_time_named_the_offers_span_the_day(state: DialogSessionState) -> None:
+    """Three earliest would always be lunch; a guest wanting the evening should hear one."""
+    slots = [make_slot(hour, 0, 4) for hour in (12, 13, 14, 18, 19, 20, 21)]
+    service = ReservationService(FakeBookingGateway(slots), NearestTimeRanking(), CODE_KEY)
+
+    offers = await service.find_offers(state, TOMORROW, party_size=2, preferred_time=None)
+
+    assert [offer.slot.slot_time.hour for offer in offers] == [12, 18, 21]
+
+
+async def test_a_bigger_party_than_the_offered_table_gets_a_table_that_fits(state: DialogSessionState) -> None:
+    """Checked for two, booked for four: same time, the smallest table that seats four."""
+    two, four, six = make_slot(18, 0, 2), make_slot(18, 0, 4), make_slot(18, 0, 6)
+    gateway = FakeBookingGateway([two, four, six])
+    service = ReservationService(gateway, NearestTimeRanking(), CODE_KEY)
+    offers = await service.find_offers(state, TOMORROW, party_size=2, preferred_time=time(18, 0))
+    assert offers[0].slot.id == two.id
+
+    summary = await service.reserve(state, offers[0].ref, "Владислав", 4)
+
+    assert summary.party_size == 4
+    assert four.id in gateway.taken and two.id not in gateway.taken
+
+
+async def test_no_table_that_fits_at_that_time_is_a_capacity_error(state: DialogSessionState) -> None:
+    gateway = FakeBookingGateway([make_slot(18, 0, 2), make_slot(20, 0, 6)])
+    service = ReservationService(gateway, NearestTimeRanking(), CODE_KEY)
+    offers = await service.find_offers(state, TOMORROW, party_size=2, preferred_time=time(18, 0))
+
+    with pytest.raises(SlotCapacityError):
+        await service.reserve(state, offers[0].ref, "Владислав", 4)
+    assert not gateway.taken
 
 
 async def test_offers_are_capped(state: DialogSessionState) -> None:

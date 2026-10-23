@@ -37,7 +37,7 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         ),
         "core_rate_limited": "Журнал бронирований сейчас перегружен. Секунду, попробую ещё раз.",
         "slot_unavailable": "Извините, этот столик только что заняли. Посмотрю, что есть рядом по времени.",
-        "slot_capacity_exceeded": "За этот столик столько гостей не поместится. Подберу побольше.",
+        "slot_capacity_exceeded": "На это время свободного стола на столько гостей нет. Посмотреть другое время?",
         "entity_not_found": "Не нахожу брони на это имя и число. Может быть, она на другой день?",
         # {date} is the day that was actually searched, spoken: a misheard date is the one
         # failure the guest can fix at once, but only if they are told which one it was.
@@ -69,7 +69,7 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         ),
         "core_rate_limited": "The reservations diary is busy at the moment. One second, let me try again.",
         "slot_unavailable": "Sorry, that table has just been taken. Let me see what's free around that time.",
-        "slot_capacity_exceeded": "That table won't seat your party. Let me find a bigger one.",
+        "slot_capacity_exceeded": "There's no free table for that many at that time. Shall I look at another time?",
         "entity_not_found": "I can't find a booking under that name for that date. Might it be another day?",
         "booking_not_found_on_date": (
             "I can't find a booking under that name on {date}. Did I get the date right? "

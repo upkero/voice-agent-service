@@ -13,7 +13,12 @@ from logging import getLogger
 from uuid import UUID
 
 from src.app.contracts.booking import BookingStatus, BookingSummary, SlotDTO, SlotOffer
-from src.app.exceptions.booking import IdempotencyKeyConsumedError, InactiveBookingError, WrongBookingCodeError
+from src.app.exceptions.booking import (
+    IdempotencyKeyConsumedError,
+    InactiveBookingError,
+    SlotCapacityError,
+    WrongBookingCodeError,
+)
 from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
 from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.services.booking.name_match import names_match
@@ -54,6 +59,12 @@ class ReservationService:
         for slot in sorted(slots, key=lambda slot: slot.capacity):
             smallest.setdefault(slot.slot_time, slot)
         ranked = self._ranking.rank(list(smallest.values()), preferred_time)
+        if preferred_time is None and len(ranked) > MAX_OFFERS:
+            # No time named: the first three would always be lunch. Spread the
+            # offers over the day instead (earliest, middle, latest), so a guest
+            # who wanted the evening hears an evening time.
+            last = len(ranked) - 1
+            ranked = [ranked[round(i * last / (MAX_OFFERS - 1))] for i in range(MAX_OFFERS)]
         return state.offer_slots(ranked[:MAX_OFFERS])
 
     async def reserve(
@@ -69,6 +80,11 @@ class ReservationService:
         issued is rejected here, before anything is sent to ops-core-api.
         """
         slot = state.resolve_slot(slot_ref)
+        if party_size > slot.capacity:
+            # The offer was made for a smaller party (the guest changed the
+            # number, or it was checked before they gave it). The guest chose a
+            # time, not a table: take the smallest free one at that time that fits.
+            slot = await self._table_that_fits(slot, party_size)
         key = self._idempotency_key(state, slot_ref, guest_name, party_size)
 
         try:
@@ -103,6 +119,13 @@ class ReservationService:
         return state.register_booking(
             booking, slot_date=slot.slot_date, slot_time=slot.slot_time, code=self.booking_code(booking.id)
         )
+
+    async def _table_that_fits(self, offered: SlotDTO, party_size: int) -> SlotDTO:
+        free = await self._bookings.list_available_slots(offered.slot_date, party_size)
+        same_time = [slot for slot in free if slot.slot_time == offered.slot_time]
+        if not same_time:
+            raise SlotCapacityError()
+        return min(same_time, key=lambda slot: slot.capacity)
 
     async def find_existing(
         self,
