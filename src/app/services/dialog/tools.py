@@ -33,7 +33,7 @@ from src.app.contracts.booking import BookingSummary, SlotOffer
 from src.app.core.settings.agent import AgentSettings
 from src.app.core.telemetry import guest_name_fp
 from src.app.exceptions.booking import BookingError
-from src.app.messages import phrase
+from src.app.messages import phrase, spoken_date
 from src.app.prompts import get_prompt
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
@@ -321,7 +321,12 @@ class BookingTools:
                 self._state, args.guest_name.strip(), args.booking_date, args.booking_code
             )
             if not summaries:
-                return {"ok": True, "bookings": [], "say": phrase(self.language, "entity_not_found")}
+                # The date goes back to the guest: a nil result for a misheard date is
+                # indistinguishable from no booking unless they hear which day was searched.
+                say = phrase(
+                    self.language, "booking_not_found_on_date", date=spoken_date(self.language, args.booking_date)
+                )
+                return {"ok": True, "bookings": [], "say": say}
             return {"ok": True, "bookings": [self._render_booking(item) for item in summaries]}
 
         return await self._guarded(run)

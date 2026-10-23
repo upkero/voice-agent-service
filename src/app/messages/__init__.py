@@ -17,6 +17,7 @@ a class per locale would be ceremony around a dictionary.
 """
 
 import random
+from datetime import date
 from typing import Final
 
 _FALLBACK_LANGUAGE = "en"
@@ -38,6 +39,11 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         "slot_unavailable": "Извините, этот столик только что заняли. Посмотрю, что есть рядом по времени.",
         "slot_capacity_exceeded": "За этот столик столько гостей не поместится. Подберу побольше.",
         "entity_not_found": "Не нахожу брони на это имя и число. Может быть, она на другой день?",
+        # {date} is the day that was actually searched, spoken: a misheard date is the one
+        # failure the guest can fix at once, but only if they are told which one it was.
+        "booking_not_found_on_date": (
+            "Не нахожу брони на это имя на {date}. Я правильно поняла дату? Если нет, назовите, пожалуйста, нужную."
+        ),
         "not_cancellable": (
             "Чтобы отменить эту бронь, мне нужен код брони — я называла его, когда вы бронировали. "
             "Если кода нет, позвоните, пожалуйста, администратору."
@@ -65,6 +71,10 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         "slot_unavailable": "Sorry, that table has just been taken. Let me see what's free around that time.",
         "slot_capacity_exceeded": "That table won't seat your party. Let me find a bigger one.",
         "entity_not_found": "I can't find a booking under that name for that date. Might it be another day?",
+        "booking_not_found_on_date": (
+            "I can't find a booking under that name on {date}. Did I get the date right? "
+            "If not, please tell me the right one."
+        ),
         "not_cancellable": (
             "To cancel that booking I need its booking code — I gave it to you when you booked. "
             "If you don't have it, please call the restaurant directly."
@@ -165,10 +175,52 @@ def greeting_line(language: str, agent_name: str, venue_name: str) -> str:
     return template.format(agent_name=agent_name, venue_name=venue_name)
 
 
-def phrase(language: str, code: str) -> str:
-    """Look up a sentence, falling back to English rather than to nothing."""
+def phrase(language: str, code: str, **fields: str) -> str:
+    """Look up a sentence, falling back to English rather than to nothing.
+
+    `fields` fill the placeholders of the few sentences that have any.
+    """
     table = ERROR_PHRASES.get(language) or ERROR_PHRASES[_FALLBACK_LANGUAGE]
-    return table.get(code) or ERROR_PHRASES[_FALLBACK_LANGUAGE].get(code, ERROR_PHRASES["en"]["booking_error"])
+    text = table.get(code) or ERROR_PHRASES[_FALLBACK_LANGUAGE].get(code, ERROR_PHRASES["en"]["booking_error"])
+    return text.format(**fields) if fields else text
+
+
+_MONTHS: Final[dict[str, tuple[str, ...]]] = {
+    "ru": (
+        "января",
+        "февраля",
+        "марта",
+        "апреля",
+        "мая",
+        "июня",
+        "июля",
+        "августа",
+        "сентября",
+        "октября",
+        "ноября",
+        "декабря",
+    ),
+    "en": (
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ),
+}
+
+
+def spoken_date(language: str, day: date) -> str:
+    """A date as it is read aloud ("24 июля"), not "2026-07-24", which a voice reads digit by digit."""
+    months = _MONTHS.get(language) or _MONTHS[_FALLBACK_LANGUAGE]
+    return f"{day.day} {months[day.month - 1]}"
 
 
 def degradation_message(language: str, kind: str) -> str:

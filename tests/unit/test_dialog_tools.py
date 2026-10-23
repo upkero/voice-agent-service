@@ -241,3 +241,14 @@ async def test_the_booking_code_round_trips_through_the_tools(
     cancelled = await later.cancel_booking({"booking_ref": found["bookings"][0]["ref"], "confirmed": True})
 
     assert cancelled["ok"] is True
+
+
+async def test_a_miss_names_the_date_that_was_searched(tools: BookingTools) -> None:
+    """A misheard date looks exactly like no booking, unless the guest hears which day was searched."""
+    result = await tools.find_booking(
+        {"guest_name": "Ivanov", "booking_date": TOMORROW.isoformat(), "booking_code": None}
+    )
+
+    assert result["ok"] is True
+    assert result["bookings"] == []
+    assert "24 July" in result["say"]
