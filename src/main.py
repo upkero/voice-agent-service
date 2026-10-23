@@ -22,7 +22,7 @@ from src.app.bootstrap.container import ApplicationContainer
 from src.app.core.logging import setup_logging
 from src.app.core.settings.app import get_app_settings
 from src.app.core.settings.logging import get_logging_settings
-from src.app.core.telemetry import instrument_app, setup_tracing
+from src.app.core.telemetry import instrument_app, setup_metrics, setup_tracing
 
 
 @asynccontextmanager
@@ -40,7 +40,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     setup_logging(get_logging_settings())
-    setup_tracing("voice-api", "voice-agent-service")
+    # Metrics here only: the worker's job processes exit per call and file theirs
+    # through prometheus_client (voice/metrics), so they never call setup_metrics.
+    setup_metrics(setup_tracing("voice-api", "voice-agent-service").resource)
 
     app = FastAPI(
         title="Voice Agent Service",

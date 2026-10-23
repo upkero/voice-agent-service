@@ -15,6 +15,15 @@ from datetime import date  # noqa: E402
 import pytest  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+from opentelemetry import trace  # noqa: E402
+from opentelemetry.sdk.trace import TracerProvider  # noqa: E402
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor  # noqa: E402
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter  # noqa: E402
+
+# The meter provider has to exist before src.main builds the app; isort must not reorder this.
+from tests import telemetry  # noqa: E402
+
+# isort: split
 
 from src.app.api.v1.middleware.rate_limit import reset_rate_limit  # noqa: E402
 from src.app.core.settings.agent import AgentSettings  # noqa: E402
@@ -68,6 +77,19 @@ def tools(
     agent_settings: AgentSettings,
 ) -> BookingTools:
     return BookingTools(reservations, state, agent_settings, today=lambda: TODAY)
+
+
+@pytest.fixture
+def spans() -> Iterator[InMemorySpanExporter]:
+    """The finished spans of one test, read with `telemetry.finished_spans()`."""
+    provider = trace.get_tracer_provider()
+    assert isinstance(provider, TracerProvider)
+    if not getattr(provider, "_test_exporter_added", False):
+        provider.add_span_processor(SimpleSpanProcessor(telemetry.exporter))
+        provider._test_exporter_added = True  # type: ignore[attr-defined]
+    telemetry.exporter.clear()
+    yield telemetry.exporter
+    telemetry.exporter.clear()
 
 
 @pytest.fixture

@@ -5,14 +5,11 @@ whose client is built by the production factory, against a stubbed transport.
 """
 
 import logging
-from collections.abc import Iterator
 from uuid import uuid4
 
 import httpx
 import pytest
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from src.app.core.settings.agent import AgentSettings
@@ -27,21 +24,6 @@ from src.entrypoint import bind_call
 from tests.fakes import CODE_KEY, TOMORROW
 
 _tracer = trace.get_tracer(__name__)
-# Set once per process: OTel refuses to replace a global provider, and
-# src.main installs one at import (conftest imports it).
-_exporter = InMemorySpanExporter()
-
-
-@pytest.fixture
-def spans() -> Iterator[InMemorySpanExporter]:
-    provider = trace.get_tracer_provider()
-    assert isinstance(provider, TracerProvider)
-    if not getattr(provider, "_test_exporter_added", False):
-        provider.add_span_processor(SimpleSpanProcessor(_exporter))
-        provider._test_exporter_added = True  # type: ignore[attr-defined]
-    _exporter.clear()
-    yield _exporter
-    _exporter.clear()
 
 
 async def test_find_booking_span_sits_under_the_tool_and_above_ops_core(spans: InMemorySpanExporter) -> None:
