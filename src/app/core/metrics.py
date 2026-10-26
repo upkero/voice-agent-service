@@ -66,6 +66,12 @@ TTS_CHARACTERS = Counter("voice_tts_characters_total", "Characters sent to TTS."
 COST_USD = Counter("voice_cost_usd_total", "Spend by component.", ["component", "provider", "model"])
 
 CALL_OUTCOMES = ("booked", "cancelled", "lookup_only", "no_action", "failed_start")
+# Every result CallStats files under each op of voice_bookings_total.
+BOOKING_RESULTS: dict[str, tuple[str, ...]] = {
+    "create": ("created", "failed"),
+    "cancel": ("cancelled", "not_found", "wrong_code", "failed"),
+    "find": ("found", "not_found", "wrong_code", "failed"),
+}
 
 
 def preinitialise(languages: tuple[str, ...]) -> None:
@@ -81,5 +87,6 @@ def preinitialise(languages: tuple[str, ...]) -> None:
             CALLS.labels(outcome, language)
     for kind in ("stt", "tts", "startup"):
         DEGRADATION_NOTICES.labels(kind)
-    for result in ("found", "not_found"):
-        BOOKINGS.labels("find", result)
+    for op, results in BOOKING_RESULTS.items():
+        for result in results:
+            BOOKINGS.labels(op, result)
