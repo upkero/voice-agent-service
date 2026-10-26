@@ -33,13 +33,14 @@ _PCM_SAMPLE_RATE = 24000
 
 
 class OpenAICompatibleTTSClient(TTSClient):
-    def __init__(self, settings: TTSSettings, voice: str, client: AsyncOpenAI) -> None:
+    def __init__(self, settings: TTSSettings, model: str, voice: str, client: AsyncOpenAI) -> None:
         super().__init__(
             capabilities=tts.TTSCapabilities(streaming=False),
             sample_rate=_PCM_SAMPLE_RATE,
             num_channels=_NUM_CHANNELS,
         )
         self._settings = settings
+        self._model = model
         self._voice = voice
         self._client = client
 
@@ -53,7 +54,7 @@ class OpenAICompatibleTTSClient(TTSClient):
 
     @property
     def model(self) -> str:
-        return self._settings.model
+        return self._model
 
     @property
     def provider(self) -> str:
@@ -94,7 +95,7 @@ class _OpenAICompatibleStream(tts.ChunkedStream):
 
         try:
             async with client.client.audio.speech.with_streaming_response.create(
-                model=client.settings.model,
+                model=client.model,
                 voice=client.voice,
                 input=self._input_text,
                 response_format=_RESPONSE_FORMAT,

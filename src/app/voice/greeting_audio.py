@@ -1,14 +1,14 @@
 """The opening line, synthesised before anyone calls.
 
 Left to itself the greeting costs the guest 7-10 seconds of silence after joining: a
-model writes it, then a remote voice (Gemini through OpenRouter) says it. The text is
+model writes it, then the configured voice (TTS_PROVIDER) says it. The text is
 fixed per language (`messages.greeting_line`), so its audio can be made once when the
 worker starts and played from memory at the start of every call.
 
 Per process, in memory, on purpose: nothing to invalidate when the voice or model
 changes, and the worker pool is a handful of processes, so the cost is one short
 sentence per language per process at startup. If synthesis fails here the call simply
-falls back to the old path (model writes it, the voice says it).
+falls back to the live path (model writes it, the voice says it).
 """
 
 import asyncio
@@ -76,9 +76,10 @@ def prewarm_greetings_in_background(agent_settings: AgentSettings, tts_settings:
     """Start `prewarm_greetings` on a thread and return at once.
 
     It must not run inside the worker's `prewarm`: livekit gives process initialisation
-    a fixed budget (10 s), a remote voice takes longer than that for two sentences, and a
-    process that overruns is killed and respawned in a loop. A call that arrives before the
-    audio is ready just takes the old path, so being late costs nothing.
+    a fixed budget (`initialize_process_timeout` in `src/entrypoint.py`), a cloud voice can
+    take a large share of it for two sentences, and a process that overruns is killed and
+    respawned in a loop. A call that arrives before the audio is ready just takes the live
+    path, so being late costs nothing.
     """
     threading.Thread(
         target=prewarm_greetings, args=(agent_settings, tts_settings), name="greeting-prewarm", daemon=True

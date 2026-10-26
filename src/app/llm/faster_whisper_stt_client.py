@@ -35,7 +35,7 @@ def load_model(name: str, compute_type: str) -> Any:
 
 
 class FasterWhisperSTTClient(STTClient):
-    def __init__(self, settings: STTSettings, language: str) -> None:
+    def __init__(self, settings: STTSettings, language: str, model: str) -> None:
         # streaming=False: Whisper transcribes a finished utterance, it does not
         # emit partials. Declaring that truthfully matters — the session wraps a
         # non-streaming STT in its own VAD-driven segmenter, and claiming
@@ -43,6 +43,7 @@ class FasterWhisperSTTClient(STTClient):
         super().__init__(capabilities=stt.STTCapabilities(streaming=False, interim_results=False))
         self._settings = settings
         self._language = settings.language or language
+        self._model_name = model
         self._model: Any | None = None
         self._load_lock = asyncio.Lock()
 
@@ -50,7 +51,7 @@ class FasterWhisperSTTClient(STTClient):
     # it labels says "unknown".
     @property
     def model(self) -> str:
-        return self._settings.model
+        return self._model_name
 
     @property
     def provider(self) -> str:
@@ -63,7 +64,7 @@ class FasterWhisperSTTClient(STTClient):
         async with self._load_lock:
             if self._model is None:
                 self._model = await asyncio.to_thread(
-                    load_model, self._settings.model, self._settings.compute_type
+                    load_model, self._model_name, self._settings.compute_type
                 )
             return self._model
 

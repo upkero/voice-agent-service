@@ -42,7 +42,7 @@ _WHISPERLIVE_SAMPLE_RATE = 16000
 
 
 class WhisperStreamSTTClient(STTClient):
-    def __init__(self, settings: STTSettings, language: str) -> None:
+    def __init__(self, settings: STTSettings, language: str, model: str) -> None:
         # streaming=True is the whole point: it puts the session on the live
         # path (stream()) instead of the VAD-buffered recognize() path.
         super().__init__(capabilities=stt.STTCapabilities(streaming=True, interim_results=True))
@@ -51,9 +51,8 @@ class WhisperStreamSTTClient(STTClient):
         if not settings.whisper_stream_url:
             raise ValueError("STT_WHISPER_STREAM_URL is required for the whisper_stream provider.")
         self._url = settings.whisper_stream_url
-        # WhisperLive names its own model set (tiny..large-v3). "small" from the
-        # faster_whisper default carries over sensibly.
-        self._model = settings.model
+        # WhisperLive names its own model set (tiny..large-v3).
+        self._model = model
 
     @property
     def model(self) -> str:

@@ -55,25 +55,29 @@ def create_stt(settings: STTSettings, language: str, vad: vad_module.VAD | None 
 
 
 def _build_one(provider: STTProvider, settings: STTSettings, language: str) -> stt.STT[Any]:
+    # Each provider loads its own model: STT_MODEL for the primary, STT_FALLBACK_MODEL
+    # for the fallback, so a Deepgram name never reaches Whisper or the reverse.
+    model = settings.model_for(provider)
+
     if provider == "faster_whisper":
         from src.app.llm.faster_whisper_stt_client import FasterWhisperSTTClient
 
-        logger.info("STT: faster-whisper %s (%s)", settings.model, settings.language or language)
-        return FasterWhisperSTTClient(settings, language)
+        logger.info("STT: faster-whisper %s (%s)", model, settings.language or language)
+        return FasterWhisperSTTClient(settings, language, model)
 
     if provider == "openai_compatible":
         from openai import AsyncOpenAI
 
         from src.app.llm.openai_compatible_stt_client import OpenAICompatibleSTTClient
 
-        logger.info("STT: OpenAI-compatible %s at %s", settings.model, settings.base_url)
+        logger.info("STT: OpenAI-compatible %s at %s", model, settings.base_url)
         client = AsyncOpenAI(
             api_key=settings.api_key or "not-needed",
             base_url=settings.base_url,
             timeout=settings.timeout_seconds,
             max_retries=settings.max_retries,
         )
-        return OpenAICompatibleSTTClient(settings, language, client)
+        return OpenAICompatibleSTTClient(settings, language, model, client)
 
     if provider == "deepgram":
         # The plugin already is an stt.STT with streaming=True, so it is used
@@ -81,9 +85,6 @@ def _build_one(provider: STTProvider, settings: STTSettings, language: str) -> s
         # plugin already satisfies.
         from livekit.plugins import deepgram
 
-        # "small" is the faster_whisper default and means nothing to Deepgram, so
-        # a user who switched provider but not model still gets a valid model.
-        model = settings.model if settings.model != "small" else "nova-3"
         # STTSettings validation already refuses this combination, so reaching
         # here means the settings were built some other way. Same class of
         # problem as create_llm's missing key, and it gets the same typed error
@@ -102,7 +103,7 @@ def _build_one(provider: STTProvider, settings: STTSettings, language: str) -> s
         from src.app.llm.whisper_stream_stt_client import WhisperStreamSTTClient
 
         logger.info("STT: self-hosted WhisperLive at %s (streaming)", settings.whisper_stream_url)
-        return WhisperStreamSTTClient(settings, language)
+        return WhisperStreamSTTClient(settings, language, model)
 
     raise ValueError(f"Unsupported STT provider: {provider}")
 

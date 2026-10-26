@@ -11,6 +11,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Cartesia is the low-latency path; the others buffer more before the first sound.
 TTSProvider = Literal["piper", "openai_compatible", "cartesia"]
 
+# The model a cloud provider uses when TTS_MODEL is unset. piper has no model
+# name: its voice file is the model (TTS_VOICE).
+DEFAULT_TTS_MODELS: dict[TTSProvider, str] = {
+    "openai_compatible": "tts-1",
+    "cartesia": "sonic-2",
+}
+
 # Per-language default voices, used when TTS_VOICE is unset. Both are baked
 # into the agent image at build time, so switching AGENT_LANGUAGE needs no
 # download and no other change.
@@ -30,8 +37,8 @@ class TTSSettings(BaseSettings):
     fallback_provider: TTSProvider | None = Field(
         default="piper",
         description=(
-            "Second provider, wrapped with the primary in a FallbackAdapter. If the primary (e.g. "
-            "streaming cartesia) fails, the session fails over to this one. Defaults to piper — the "
+            "Second provider, wrapped with the primary in a FallbackAdapter. If the primary (a cloud "
+            "voice) fails, the session fails over to this one. Defaults to piper — the "
             "binary and both voices are baked into the agent image, so a cloud outage degrades to an "
             "offline voice instead of to silence. Ignored when it equals the primary; set to an empty "
             "value to run with no fallback at all."
@@ -41,10 +48,13 @@ class TTSSettings(BaseSettings):
         default=None,
         description="Voice name for the chosen provider. Voice sets differ per provider/model.",
     )
-    model: str = Field(
-        default="tts-1",
+    model: str | None = Field(
+        default=None,
         min_length=1,
-        description="Model name: the openai_compatible speech model, or the Cartesia model id.",
+        description=(
+            "Model of the primary provider: the openai_compatible speech model, or the Cartesia model "
+            "id. Unset means the provider's default from DEFAULT_TTS_MODELS. piper ignores it."
+        ),
     )
     base_url: str | None = Field(
         default=None,
@@ -86,14 +96,20 @@ class TTSSettings(BaseSettings):
             raise ValueError("TTS_API_KEY (a Cartesia key) is required when TTS uses the cartesia provider.")
         return self
 
+    def model_for(self, provider: TTSProvider) -> str:
+        """The model a cloud provider is asked for. TTS_MODEL names the primary's model."""
+        if self.model and provider == self.provider:
+            return self.model
+        return DEFAULT_TTS_MODELS[provider]
+
     def resolve_voice(self, language: str, *, as_fallback: bool = False) -> str:
         """Explicit voice wins; otherwise the language decides.
 
         The default map holds piper voice names; a cloud provider needs its own
         voice set via TTS_VOICE, so this only meaningfully defaults for piper.
 
-        TTS_VOICE names a voice of the *primary* provider ("Kore" is a Gemini
-        voice, not a piper file). A piper fallback behind a cloud primary must
+        TTS_VOICE names a voice of the *primary* provider (a cloud voice name such
+        as "eve", not a piper file). A piper fallback behind a cloud primary must
         therefore ignore it, or the very outage it exists for would find it
         looking for a voice that was never installed.
         """
