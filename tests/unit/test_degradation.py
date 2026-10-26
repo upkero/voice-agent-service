@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any, cast
 from uuid import uuid4
 
+import pytest
 from livekit.agents import AgentSession, ErrorEvent, stt, tts
 
 from src.app.contracts.booking import BookingDTO, BookingStatus
@@ -208,3 +209,12 @@ def test_a_call_that_ends_unconfirmed_is_counted() -> None:
     ConfirmationTracker(state).report("room-1")
 
     assert REGISTRY.get_sample_value("voice_unconfirmed_bookings_total") == before + 1
+
+
+@pytest.mark.parametrize("language", ["ru", "en"])
+def test_no_degradation_message_asks_the_guest_to_type(language: str) -> None:
+    """The demo's call screen has no text box: a notice can only ask for a call back."""
+    from src.app.messages import DEGRADATION_MESSAGES
+
+    for text in DEGRADATION_MESSAGES[language].values():
+        assert not any(word in text.lower() for word in ("type", "chat", "напишите", "чат")), text

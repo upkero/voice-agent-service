@@ -167,10 +167,10 @@ async def start_session(
             agent=agent,
             room=ctx.room,
             room_options=room_io.RoomOptions(
-                # Text input is not only a fallback. It is what makes the
-                # degraded path an actual conversation: typed messages enter the
-                # same LLM and the same tools, so a guest with no working
-                # microphone can still book a table.
+                # Typed messages enter the same LLM and the same tools, so a
+                # client with a text box can book with no working microphone.
+                # The demo's call screen has none, which is why the degradation
+                # notices ask the guest to call back rather than to type.
                 text_input=True,
                 audio_input=True,
             ),
