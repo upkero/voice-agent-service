@@ -42,10 +42,11 @@ async def _synthesise(settings: TTSSettings, language: str, text: str) -> list[r
     # The primary only: the same voice every call gets, and a client that closes cleanly.
     engine = create_primary_tts(settings, language)
     try:
-        frames: list[rtc.AudioFrame] = []
-        async for event in engine.synthesize(text):
-            frames.append(event.frame)
-        return frames
+        # `async with`: the stream ends its tts_request span only in aclose, and running
+        # out of frames does not call it. Unclosed, the span never left the process and
+        # its child landed in Tempo as a trace with no root.
+        async with engine.synthesize(text) as stream:
+            return [event.frame async for event in stream]
     finally:
         await engine.aclose()
 
