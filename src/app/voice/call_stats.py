@@ -48,6 +48,7 @@ class CallStats:
         self.interruptions = 0
         self.fallbacks = 0
         self._booked = self._cancelled = self._looked_up = False
+        self.end_reason = ""
 
     # -- tools ------------------------------------------------------------
     def note_guest(self, fingerprint: str) -> None:
@@ -86,6 +87,7 @@ class CallStats:
         session.on("function_tools_executed", self.on_tools_executed)
         session.on("agent_false_interruption", self.on_false_interruption)
         session.on("session_usage_updated", self.on_usage)
+        session.on("close", self.on_close)
         if session.stt is not None:
             session.stt.on("stt_availability_changed", lambda e: self.on_availability("stt", e.stt, e.available))
         if session.tts is not None:
@@ -127,6 +129,10 @@ class CallStats:
         metrics.PROVIDER_FALLBACK.labels(kind, member.provider, str(available).lower()).inc()
         if not available:
             self.fallbacks += 1
+
+    def on_close(self, event: Any) -> None:
+        # The first close only: the job's own shutdown closes the session again.
+        self.end_reason = self.end_reason or str(event.reason.value)
 
     def on_usage(self, event: Any) -> None:
         """The event carries running totals for the session, so file the difference."""
@@ -192,6 +198,6 @@ class CallStats:
                 "booking_refs": list(booking_refs),
                 "confirmation_spoken": confirmation_spoken,
                 "guest_name_fp": self._guest_name_fp,
-                "shutdown_reason": reason,
+                "end_reason": reason,
             },
         )

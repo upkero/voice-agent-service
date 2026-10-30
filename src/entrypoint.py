@@ -104,6 +104,9 @@ async def entrypoint(ctx: JobContext) -> None:
     """
     room_name = ctx.room.name
     bind_call(room_name)
+    # livekit's job_entrypoint, the root of this call's trace. The shutdown callback runs
+    # outside it, and its log lines carry its trace_id only inside it.
+    call_span = trace.get_current_span()
 
     # The language is a property of the call, not of the process: the token the
     # guest joined with carries it as a participant attribute. So the room has to
@@ -124,18 +127,23 @@ async def entrypoint(ctx: JobContext) -> None:
     session = build_session(language, vad=ctx.proc.userdata.get("vad"))
 
     async def on_shutdown(reason: str = "") -> None:
-        tracker.report(room_name, reason)
+        # When the guest hangs up the session closes first and says so; livekit's reason is
+        # what stopped the job afterwards, "parent process shutdown" on every such call.
+        end_reason = stats.end_reason or reason
+        with trace.use_span(call_span):
+            tracker.report(room_name, end_reason)
         await session.aclose()
         await container.close()
-        stats.finish(
-            room=room_name,
-            job_id=ctx.job.id,
-            reason=reason,
-            degradations=notice.announced,
-            booking_refs=state.booking_refs(),
-            confirmation_spoken=tracker.confirmation_spoken,
-        )
-        logger.info("Call ended", extra={"room": room_name, "reason": reason})
+        with trace.use_span(call_span):
+            stats.finish(
+                room=room_name,
+                job_id=ctx.job.id,
+                reason=end_reason,
+                degradations=notice.announced,
+                booking_refs=state.booking_refs(),
+                confirmation_spoken=tracker.confirmation_spoken,
+            )
+            logger.info("Call ended", extra={"room": room_name, "reason": end_reason})
 
     ctx.add_shutdown_callback(on_shutdown)
 

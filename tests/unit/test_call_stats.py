@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 from livekit.agents import llm
 from livekit.agents.metrics import AgentSessionUsage, LLMModelUsage, STTModelUsage, TTSModelUsage
-from livekit.agents.voice.events import ConversationItemAddedEvent, SessionUsageUpdatedEvent
+from livekit.agents.voice.events import CloseEvent, CloseReason, ConversationItemAddedEvent, SessionUsageUpdatedEvent
 from prometheus_client import REGISTRY
 
 from src.app.services.dialog.tools import BookingTools
@@ -193,6 +193,16 @@ def test_finish_files_the_call_and_logs_one_line_without_a_name(caplog: pytest.L
     assert (record.__dict__["outcome"], record.__dict__["duration_s"]) == ("no_action", 42.5)
     assert record.__dict__["guest_name_fp"] == "abc123abc123"
     assert record.__dict__["degradations"] == ["tts"]
+    assert record.__dict__["end_reason"] == "done"
+
+
+def test_the_first_close_of_the_session_is_why_the_call_ended() -> None:
+    stats = CallStats("en")
+
+    stats.on_close(CloseEvent(reason=CloseReason.PARTICIPANT_DISCONNECTED))
+    stats.on_close(CloseEvent(reason=CloseReason.USER_INITIATED))
+
+    assert stats.end_reason == "participant_disconnected"
 
 
 def test_the_series_an_alert_reads_exist_at_zero_before_any_call() -> None:

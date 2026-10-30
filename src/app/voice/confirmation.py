@@ -63,6 +63,6 @@ class ConfirmationTracker:
                 "room": room_name,
                 "booking_refs": refs,
                 "confirmation_spoken": False,
-                "shutdown_reason": reason,
+                "end_reason": reason,
             },
         )
