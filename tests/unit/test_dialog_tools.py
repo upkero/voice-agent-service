@@ -51,12 +51,23 @@ async def test_bad_availability_arguments_are_refused(
     assert repository.calls == []
 
 
-async def test_a_party_larger_than_the_venue_takes_goes_to_a_human(
+async def test_a_party_larger_than_the_venue_takes_is_refused_locally(
     tools: BookingTools, repository: FakeBookingGateway
 ) -> None:
     result = await tools.check_availability({**VALID_AVAILABILITY, "party_size": 40})
 
     assert result["reason"] == "party_too_large"
+    assert repository.calls == []
+
+
+async def test_a_party_too_big_for_any_table_is_refused_before_a_search(
+    tools: BookingTools, repository: FakeBookingGateway
+) -> None:
+    """Nine guests would otherwise get "nothing free that day" on every day."""
+    result = await tools.check_availability({**VALID_AVAILABILITY, "party_size": 9})
+
+    assert result["reason"] == "party_too_large"
+    assert "call the restaurant" in result["say"]
     assert repository.calls == []
 
 

@@ -40,10 +40,13 @@ class AgentSettings(BaseSettings):
         description="Restaurant she answers for.",
     )
     max_party_size: int = Field(
-        default=12,
+        default=8,
         ge=1,
         le=100,
-        description="Largest party she will take by voice. Bigger groups go to a human.",
+        description=(
+            "Largest party she will take by voice: the biggest table in the ops-core-api seed seats 8, "
+            "so a larger party could never find a slot. Bigger groups are asked to call the restaurant."
+        ),
     )
     booking_horizon_days: int = Field(
         default=30,

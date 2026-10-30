@@ -203,4 +203,34 @@ def test_the_series_an_alert_reads_exist_at_zero_before_any_call() -> None:
 
     assert REGISTRY.get_sample_value("voice_calls_total", {"outcome": "failed_start", "language": "ru"}) is not None
     assert REGISTRY.get_sample_value("voice_degradation_notices_total", {"kind": "tts"}) is not None
-    assert REGISTRY.get_sample_value("voice_bookings_total", {"op": "find", "result": "not_found"}) is not None
+    for op, result in [("create", "created"), ("create", "failed"), ("cancel", "cancelled"), ("find", "not_found")]:
+        assert REGISTRY.get_sample_value("voice_bookings_total", {"op": op, "result": result}) is not None, (op, result)
+
+
+@pytest.mark.parametrize("tool", ["create_booking", "cancel_booking", "find_booking"])
+@pytest.mark.parametrize(
+    "result",
+    [
+        {"ok": True, "bookings": [{}]},
+        {"ok": True},
+        {"ok": False, "reason": "entity_not_found"},
+        {"ok": False, "reason": "wrong_booking_code"},
+        {"ok": False, "reason": "core_unavailable"},
+    ],
+)
+def test_every_booking_result_a_call_can_file_is_zero_initialised(tool: str, result: dict[str, Any]) -> None:
+    """A result missing from BOOKING_RESULTS would start at 1 and its first event would never show."""
+    from src.app.core.metrics import BOOKING_RESULTS, BOOKINGS
+
+    def totals() -> dict[tuple[str, str], float]:
+        samples = BOOKINGS.collect()[0].samples
+        return {(x.labels["op"], x.labels["result"]): x.value for x in samples if x.name.endswith("_total")}
+
+    before = totals()
+
+    CallStats("en").on_tool(tool, result, 0.1)
+
+    changed = [labels for labels, value in totals().items() if value != before.get(labels)]
+    assert len(changed) == 1
+    op, filed = changed[0]
+    assert filed in BOOKING_RESULTS[op], (op, filed)

@@ -64,7 +64,8 @@ def _build_one(
 
         from src.app.llm.openai_compatible_tts_client import OpenAICompatibleTTSClient
 
-        logger.info("TTS: OpenAI-compatible %s at %s", settings.model, settings.base_url)
+        model = settings.model_for(provider)
+        logger.info("TTS: OpenAI-compatible %s at %s", model, settings.base_url)
         client = AsyncOpenAI(
             api_key=settings.api_key or "not-needed",
             base_url=settings.base_url,
@@ -73,13 +74,13 @@ def _build_one(
         )
         # A cloud voice name is not a piper voice name, so the default map is not
         # consulted here; the provider's own voice must be set explicitly.
-        return OpenAICompatibleTTSClient(settings, settings.voice or "alloy", client)
+        return OpenAICompatibleTTSClient(settings, model, settings.voice or "alloy", client)
 
     if provider == "cartesia":
         from livekit.plugins import cartesia
 
         # Streaming, ~90ms to first byte. sonic is Cartesia's low-latency model.
-        model = settings.model if settings.model != "tts-1" else "sonic-2"
+        model = settings.model_for(provider)
         # Guaranteed by TTSSettings validation; typed rather than asserted so it
         # survives python -O and arrives in the standard error envelope.
         if settings.api_key is None:

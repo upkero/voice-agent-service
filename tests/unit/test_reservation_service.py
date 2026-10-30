@@ -11,13 +11,13 @@ from src.app.gateways.core_api_booking import CoreApiBookingGateway
 from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import MAX_OFFERS, ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
-from tests.fakes import CODE_KEY, TOMORROW, FakeBookingGateway, UnavailableBookingGateway, make_slot, seeded_slots
+from tests.fakes import CODE_KEY, TOMORROW, FakeBookingGateway, UnavailableBookingGateway, make_slot
 
 
 async def test_offers_the_nearest_times_to_the_request(
     reservations: ReservationService, state: DialogSessionState
 ) -> None:
-    """The demo phrase: a table for four at 19:00, against the real seed data.
+    """The demo phrase: a table for four at 19:00, against the sample diary.
 
     There is no 19:00 slot. Answering "no" would be correct and useless; the
     job is to come back with 19:30 and 18:00, in that order.
@@ -153,12 +153,6 @@ async def test_find_existing_returns_speakable_summaries(
     assert len(found) == 1
     assert found[0].guest_name == "Petrova"
     assert found[0].slot_date == TOMORROW
-
-
-async def test_seeded_slots_match_ops_core_api() -> None:
-    """Guards the fixture itself against drifting from the real seed data."""
-    assert [slot.slot_time.strftime("%H:%M") for slot in seeded_slots()] == ["12:00", "13:30", "18:00", "19:30"]
-    assert [slot.capacity for slot in seeded_slots()] == [2, 4, 4, 6]
 
 
 async def _book(reservations: ReservationService, name: str) -> None:

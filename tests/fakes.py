@@ -28,8 +28,13 @@ def make_slot(hour: int = 19, minute: int = 30, capacity: int = 6, slot_date: da
     return SlotDTO(id=uuid4(), slot_date=slot_date, slot_time=time(hour, minute), capacity=capacity)
 
 
-def seeded_slots(slot_date: date = TOMORROW) -> list[SlotDTO]:
-    """A small diary of single tables: 12:00, 13:30, 18:00, 19:30."""
+def sample_slots(slot_date: date = TOMORROW) -> list[SlotDTO]:
+    """A made-up diary of single tables: 12:00, 13:30, 18:00, 19:30.
+
+    Not the ops-core-api seed, which has several tables per hour and nothing at
+    half past. The half-hour slots are on purpose: they leave no exact match for
+    a 19:00 request, which is what the ranking tests need.
+    """
     return [
         make_slot(12, 0, 2, slot_date),
         make_slot(13, 30, 4, slot_date),
@@ -40,7 +45,7 @@ def seeded_slots(slot_date: date = TOMORROW) -> list[SlotDTO]:
 
 class FakeBookingGateway(BookingGateway):
     def __init__(self, slots: Sequence[SlotDTO] | None = None) -> None:
-        self.slots: dict[UUID, SlotDTO] = {slot.id: slot for slot in (slots or seeded_slots())}
+        self.slots: dict[UUID, SlotDTO] = {slot.id: slot for slot in (slots or sample_slots())}
         self.taken: set[UUID] = set()
         self.bookings: dict[UUID, BookingDTO] = {}
         self.keys: dict[str, UUID] = {}

@@ -72,6 +72,61 @@ def test_a_fallback_equal_to_the_primary_is_dropped() -> None:
     assert _stt(provider="faster_whisper", fallback_provider="faster_whisper").fallback_provider is None
 
 
+# --- Models per provider ------------------------------------------------------
+def test_the_primary_and_the_fallback_each_load_their_own_model() -> None:
+    settings = _stt(
+        provider="deepgram", api_key="dg", model="nova-2", fallback_provider="faster_whisper", fallback_model="base"
+    )
+
+    assert settings.model_for("deepgram") == "nova-2"
+    assert settings.model_for("faster_whisper") == "base"
+
+
+def test_an_unset_model_is_the_providers_default() -> None:
+    settings = _stt(provider="deepgram", api_key="dg", fallback_provider="faster_whisper")
+
+    assert settings.model_for("deepgram") == "nova-3"
+    assert settings.model_for("faster_whisper") == "small"
+
+
+def test_a_whisper_size_with_a_deepgram_primary_is_read_as_the_fallback_model() -> None:
+    """The .env from before STT_FALLBACK_MODEL: STT_MODEL=small served both providers."""
+    settings = _stt(provider="deepgram", api_key="dg", model="small", fallback_provider="faster_whisper")
+
+    assert settings.model_for("deepgram") == "nova-3"
+    assert settings.model_for("faster_whisper") == "small"
+
+
+def test_an_explicit_fallback_model_turns_the_legacy_reading_off() -> None:
+    settings = _stt(
+        provider="deepgram", api_key="dg", model="small", fallback_provider="faster_whisper", fallback_model="base"
+    )
+
+    assert settings.model_for("deepgram") == "small"
+
+
+def test_a_provider_that_is_not_configured_has_no_model() -> None:
+    with pytest.raises(ValueError, match="neither"):
+        _stt(provider="faster_whisper").model_for("deepgram")
+
+
+def test_the_deepgram_client_gets_the_deepgram_model_not_the_whisper_one() -> None:
+    client = create_stt(
+        _stt(provider="deepgram", api_key="dg", model="small", fallback_provider="faster_whisper"),
+        "ru",
+        vad=Mock(spec=vad_module.VAD),
+    )
+
+    assert isinstance(client, stt.FallbackAdapter)
+    assert [member.model for member in client._stt_instances] == ["nova-3", "small"]
+
+
+def test_tts_model_defaults_per_cloud_provider() -> None:
+    assert _tts(provider="cartesia", api_key="ct").model_for("cartesia") == "sonic-2"
+    assert _tts(provider="cartesia", api_key="ct", model="sonic-3").model_for("cartesia") == "sonic-3"
+    assert _tts(provider="openai_compatible", base_url="https://x/v1").model_for("openai_compatible") == "tts-1"
+
+
 # --- Fallback wiring ----------------------------------------------------------
 def test_no_fallback_returns_a_single_client() -> None:
     client = create_stt(_stt(provider="deepgram", api_key="dg", model="nova-3", fallback_provider=None), "ru")
@@ -168,7 +223,7 @@ def test_local_whisper_is_primed_with_booking_vocabulary(language: str, word: st
     model = Mock()
     model.transcribe.return_value = ([], None)
 
-    FasterWhisperSTTClient(_stt(), language)._transcribe(model, b"\x00\x00" * 160, language)
+    FasterWhisperSTTClient(_stt(), language, "small")._transcribe(model, b"\x00\x00" * 160, language)
 
     assert word in model.transcribe.call_args.kwargs["initial_prompt"]
 

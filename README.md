@@ -16,11 +16,25 @@ browser Web-Speech imitation.
 
 *The live demo: a real call with Mila over WebRTC.*
 
-Offline-first: speech recognition (faster-whisper) and speech synthesis (piper) both run locally,
-and LiveKit runs in development mode. `docker compose up` needs **no cloud account and no API key
-for speech** — only the key of the ops-core-api instance holding the booking data. If you point
-`LLM_*` or `TTS_*` at a hosted provider (the public demo does, via OpenRouter), transcripts and replies
-leave the machine.
+**Live demo: [upkero.com](https://upkero.com).** Call Mila from the browser, in Russian or English.
+
+What the live demo runs:
+
+| Stage | Provider |
+|---|---|
+| Speech recognition | Deepgram `nova-3`, streaming (`STT_PROVIDER=deepgram`) |
+| Speech synthesis | Grok TTS `x-ai/grok-voice-tts-1.0` via OpenRouter (`TTS_PROVIDER=openai_compatible`) |
+| Dialogue LLM | Claude Haiku `anthropic/claude-haiku-5.5` via OpenRouter |
+| Fallbacks, in the image | faster-whisper `small` for recognition, Piper for the voice |
+
+If Deepgram or the Grok voice fails, that half of the call moves to its local fallback instead
+of going silent. The LLM has no local fallback.
+
+Locally it is offline-first: speech recognition (faster-whisper) and speech synthesis (piper) both
+run on your machine, and LiveKit runs in development mode. `docker compose up` needs **no cloud
+account and no API key for speech**, only the key of the ops-core-api instance holding the booking
+data. If you point `STT_*`, `LLM_*` or `TTS_*` at a hosted provider (the live demo does), audio,
+transcripts and replies leave the machine.
 
 
 ---
@@ -37,7 +51,7 @@ leave the machine.
 
 Two processes live in this repo:
 
-1. **HTTP API** (`src/main.py`) — a thin token server: `GET /health/*` and `POST /token`, which
+1. **HTTP API** (`src/main.py`) — a thin token server: `GET /health/*` and `POST /api/v1/token`, which
    returns a LiveKit join JWT so a browser can connect to a room directly over WebRTC. No booking
    logic lives here.
 2. **Agent worker** (`src/entrypoint.py`) — the voice agent itself. Connects to the room, runs
@@ -99,7 +113,8 @@ cold start pulls nothing.
   If it is down, the demo still connects and Мила explains the outage out loud — that is the
   degradation path, live.
 - **An LLM with tool-calling** — the default `.env` points at a local Ollama
-  (`LLM_MODEL=qwen2.5:7b`). Point `LLM_*` at any OpenAI-compatible endpoint instead.
+  (`LLM_MODEL=qwen2.5:7b`). Point `LLM_*` at any OpenAI-compatible endpoint instead; the live
+  demo uses Claude Haiku through OpenRouter.
 
 ## Endpoints
 
@@ -140,11 +155,11 @@ empty — no origin is allowed until you name one. Set it (CSV, e.g.
 
 ## Talking to Мила
 
-This repo ships no web page — a portfolio site will host the demo client. To try it now, connect
-any LiveKit client to the room with the token above. The quickest is the
-[LiveKit Agents Playground](https://agents-playground.livekit.io):
+This repo ships no web page: the demo client is the call screen on [upkero.com](https://upkero.com).
+To call a local stack, connect any LiveKit client to the room with the token above. The quickest
+is the [LiveKit Agents Playground](https://agents-playground.livekit.io):
 
-1. `POST /token` as above, and copy `token` + `livekit_url`.
+1. `POST /api/v1/token` as above, and copy `token` + `livekit_url`.
 2. Open the Playground, choose **Manual** connection, paste the URL and token, connect.
 3. Say *"a table for four tomorrow at seven"* (or, with `AGENT_LANGUAGE=ru`,
    *"стол на четверых завтра в семь вечера"*).
@@ -169,7 +184,7 @@ wrapping a batch client in its own VAD segmenter and feeding a streaming one liv
 |---|---|---|---|
 | `faster_whisper` | batch, local | ~1-2s (CPU) | nothing — offline default |
 | `openai_compatible` | batch REST | ~2s/clip | `STT_BASE_URL` / `STT_API_KEY` / `STT_MODEL` (OpenRouter, OpenAI, …) |
-| `deepgram` | **streaming** | ~150-300ms | a Deepgram key in `STT_API_KEY`, `STT_MODEL=nova-3` |
+| `deepgram` | **streaming** | ~150-300ms | a Deepgram key in `STT_API_KEY`; `STT_MODEL` defaults to `nova-3` |
 | `whisper_stream` | **streaming** | ~1s on GPU | `STT_WHISPER_STREAM_URL` → a self-hosted WhisperLive |
 
 | `TTS_PROVIDER` | Mode | First byte | Needs |
@@ -192,6 +207,17 @@ are baked into the agent image, run offline and cost nothing, so putting a cloud
 anything: a Deepgram or Cartesia outage becomes a slower answer rather than the guest's problem.
 A fallback equal to the primary is ignored, so the all-local default stays a single client; set
 the variable empty to run with no fallback at all.
+
+Each side names its own model: `STT_MODEL` is the primary's, `STT_FALLBACK_MODEL` the fallback's,
+and an unset one takes its provider's default (`nova-3` for Deepgram, `small` for Whisper). The
+live demo's recognition, written out:
+
+```bash
+STT_PROVIDER=deepgram
+STT_MODEL=nova-3
+STT_FALLBACK_PROVIDER=faster_whisper
+STT_FALLBACK_MODEL=small
+```
 
 The offline fallback is a batch provider, and the `FallbackAdapter` needs a VAD to segment one —
 `build_session` supplies Silero from the worker's prewarm. A missing VAD is a startup error rather
@@ -225,10 +251,11 @@ and it is checkable.
 
 | Failure | What the guest gets |
 |---|---|
-| ops-core-api down / 5xx | A spoken sentence ("I can't reach the diary right now — please try again in a few minutes or call the restaurant directly"). No callback is promised: nothing here could store a number. No exception reaches the pipeline. |
+| ops-core-api down / 5xx | A spoken sentence ("I can't reach the reservations diary right now. The system seems to be down. I can't book anything at the moment: please try again in a few minutes or call the restaurant directly."). No callback is promised: nothing here could store a number. No exception reaches the pipeline. |
 | ops-core-api slow or hanging | "One moment, let me check" as soon as a booking tool starts; after `AGENT_TOOL_WAIT_SECONDS` (8 s) in total, retries included, the outage sentence above. |
-| TTS provider fails | The reply text is published to the room's data channel and the problem is announced once. The session stays up. |
-| STT provider fails | Мила says she cannot hear (TTS still works); text input stays enabled, so the same LLM + tools loop works by typing. |
+| TTS provider fails | The reply text is published to the room's data channel and a notice asks the guest to call back in a few minutes. The session stays up. |
+| STT provider fails | Мила says she cannot hear and asks the guest to call back (TTS still works). Text input stays enabled for a client that has a text box, where the same LLM + tools loop works by typing; the demo's call screen has none. |
+| Party larger than `AGENT_MAX_PARTY_SIZE` (8, the largest seeded table) | Refused before any search, with a request to call the restaurant directly. There is no transfer to a person. |
 | The session itself fails to start | The job fails and the room closes. One last sentence goes out over the data channel first, but there is no text fallback here: `text_enabled` is an option *of* the session, so a session that never started cannot receive typed messages either. |
 
 ## Design notes worth reading
@@ -280,7 +307,7 @@ uv run mypy src
 uv run pytest --cov=src/app/services --cov-report=term-missing
 ```
 
-165 tests, ~97% coverage on the service layer. No database and no network: the `BookingGateway`
+335 tests, ~98% coverage on the service layer. No database and no network: the `BookingGateway`
 port is replaced with an in-memory fake (its second implementation), so the whole suite runs
 offline. CI runs the same four commands on every push.
 
@@ -307,6 +334,13 @@ PASS model called: check_availability  args={"booking_date":"2026-07-24","party_
 and speakers — no LiveKit server, no token, no browser. The fastest way to actually hear her.
 (Run it on the host, not in Docker: a container has no audio devices. Booking still needs
 ops-core-api up; without it she says she can't reach the diary — the degradation path, live.)
+
+## Observability
+
+- **Traces:** OpenTelemetry, exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. One call is one trace, from the worker's turns, LLM and TTS spans down to ops-core-api's SQL: the booking client sends `traceparent` and `X-Request-ID: room-<room>` on every request.
+- **Metrics:** the worker serves Prometheus `/metrics` on `WORKER_PROMETHEUS_PORT` (9464): turn latency per stage and provider, tool calls, bookings, calls by outcome, provider failovers, STT minutes, TTS characters and spend. The series alerts read start at 0 when a worker process starts.
+- **Logs:** JSON with `trace_id`, `span_id` and `request_id` on every line, so a log line opens its trace. Guest names appear in logs only as a keyed fingerprint (`OBS_FINGERPRINT_KEY`); the booking spans carry them in plain text, by design.
+- **HTTP API:** OTel server spans and request metrics for `/api/v1/token`; `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS=health/live,health/ready` leaves the probes out.
 
 ## Out of scope (by choice)
 

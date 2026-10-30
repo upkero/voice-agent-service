@@ -32,7 +32,7 @@ _FALLBACK_LANGUAGE = "en"
 ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
     "ru": {
         "core_unavailable": (
-            "Не могу сейчас заглянуть в журнал бронирований — похоже, система недоступна. "
+            "Не могу сейчас заглянуть в журнал бронирований. Похоже, система недоступна. "
             "Сейчас забронировать не получится: попробуйте через несколько минут или позвоните администратору."
         ),
         "core_rate_limited": "Журнал бронирований сейчас перегружен. Секунду, попробую ещё раз.",
@@ -45,7 +45,7 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
             "Не нахожу брони на это имя на {date}. Я правильно поняла дату? Если нет, назовите, пожалуйста, нужную."
         ),
         "not_cancellable": (
-            "Чтобы отменить эту бронь, мне нужен код брони — я называла его, когда вы бронировали. "
+            "Чтобы отменить эту бронь, мне нужен код брони. Я называла его, когда вы бронировали. "
             "Если кода нет, позвоните, пожалуйста, администратору."
         ),
         "wrong_booking_code": "Этот код не подходит к брони на это имя и число. Проверьте его, пожалуйста.",
@@ -58,13 +58,15 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         "not_confirmed": "Поняла, ничего не бронирую. Скажите, когда будете готовы подтвердить.",
         "no_slots": "На это число свободных столиков нет. Посмотреть соседние дни?",
         "invalid_arguments": "Я не расслышала. Повторите, пожалуйста, дату, время и количество гостей.",
-        "party_too_large": "Такую большую компанию я по телефону не оформлю — соединю вас с администратором.",
+        "party_too_large": (
+            "Такую большую компанию я по телефону не оформлю. Позвоните, пожалуйста, в ресторан напрямую."
+        ),
         "date_in_past": "Эта дата уже прошла. На какой день оформляем бронь?",
         "date_too_far": "Так далеко вперёд мы пока не бронируем.",
     },
     "en": {
         "core_unavailable": (
-            "I can't reach the reservations diary right now — the system seems to be down. "
+            "I can't reach the reservations diary right now. The system seems to be down. "
             "I can't book anything at the moment: please try again in a few minutes or call the restaurant directly."
         ),
         "core_rate_limited": "The reservations diary is busy at the moment. One second, let me try again.",
@@ -76,7 +78,7 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
             "If not, please tell me the right one."
         ),
         "not_cancellable": (
-            "To cancel that booking I need its booking code — I gave it to you when you booked. "
+            "To cancel that booking I need its booking code. I gave it to you when you booked. "
             "If you don't have it, please call the restaurant directly."
         ),
         "wrong_booking_code": "That code doesn't match a booking under that name and date. Could you check it?",
@@ -89,26 +91,26 @@ ERROR_PHRASES: Final[dict[str, dict[str, str]]] = {
         "not_confirmed": "Understood, I won't book anything. Just say the word when you're ready.",
         "no_slots": "There's nothing free that day. Shall I check the days either side?",
         "invalid_arguments": "I didn't catch that. Could you repeat the date, the time and the number of guests?",
-        "party_too_large": "A party that size needs a person — let me put you through to the manager.",
+        "party_too_large": "I can't book a party that size by phone. Please call the restaurant directly.",
         "date_in_past": "That date has already passed. Which day did you have in mind?",
         "date_too_far": "We're not taking bookings that far ahead yet.",
     },
 }
 
 # What goes out over the data channel when an audio leg is gone. Same rule as
-# above: heard or read by the guest verbatim, so one copy per language.
+# above: read by the guest verbatim, so one copy per language. None of them asks
+# the guest to type: the demo's call screen has no text box, so a dead audio leg
+# ends in "call back", not in a chat that is not there.
 DEGRADATION_MESSAGES: Final[dict[str, dict[str, str]]] = {
     "ru": {
-        "tts": "Голос сейчас недоступен — отвечаю текстом в этом чате.",
-        "stt": "Я вас не слышу — микрофон или распознавание недоступны. Напишите, пожалуйста, сообщением.",
-        # No promise of a text conversation here: if the session itself failed to
-        # start, there is nothing left to answer on and the room is closing.
-        "startup": "Не могу принять звонок — техническая неполадка. Перезвоните, пожалуйста.",
+        "tts": "Голос сейчас недоступен. Перезвоните, пожалуйста, через несколько минут.",
+        "stt": "Я вас не слышу: микрофон или распознавание недоступны. Перезвоните, пожалуйста.",
+        "startup": "Не могу принять звонок, техническая неполадка. Перезвоните, пожалуйста.",
     },
     "en": {
-        "tts": "My voice is unavailable right now — I'll answer here in the chat.",
-        "stt": "I can't hear you — speech recognition is unavailable. Please type instead.",
-        "startup": "I can't take the call — something has gone wrong on our side. Please call back.",
+        "tts": "My voice is unavailable right now. Please call back in a few minutes.",
+        "stt": "I can't hear you, speech recognition is unavailable. Please call back.",
+        "startup": "I can't take the call, something has gone wrong on our side. Please call back.",
     },
 }
 

@@ -4,8 +4,8 @@ Run with:  python -m src.entrypoint dev      (local, hot reload)
            python -m src.entrypoint start    (production)
 
 Separate from the HTTP process because the two have nothing to share. This one
-holds a Whisper model and a voice in memory and is busy for the length of a
-phone call; the other answers a request in a millisecond. Scaling them together
+holds speech models (VAD, turn detection, any local STT or TTS) in memory and
+is busy for the length of a phone call; the other answers a request in a millisecond. Scaling them together
 would mean sizing the API for the agent's memory, or the agent for the API's
 concurrency, and neither is a trade worth making.
 """
@@ -47,9 +47,10 @@ logger = getLogger(__name__)
 def prewarm(proc: JobProcess) -> None:
     """Load what every call needs, once per process.
 
-    Voice activity detection and the Whisper model are loaded here rather than per
-    job because they are the same for every call, and loading them on the first
-    one costs the guest seconds of silence.
+    Voice activity detection and a local Whisper model (when faster_whisper is
+    the primary or the fallback STT) are loaded here rather than per job because
+    they are the same for every call, and loading them on the first one costs the
+    guest seconds of silence.
     """
     setup_logging(get_logging_settings())
     # Here, not at import: under forkserver an import-time provider would be
@@ -69,7 +70,7 @@ def prewarm(proc: JobProcess) -> None:
         # loading it on the first utterance costs the guest ~10 s of silence.
         from src.app.llm.faster_whisper_stt_client import load_model
 
-        load_model(stt_settings.model, stt_settings.compute_type)
+        load_model(stt_settings.model_for("faster_whisper"), stt_settings.compute_type)
     prewarm_greetings_in_background(get_agent_settings(), get_tts_settings())
     logger.info("Worker prewarmed", extra={"language": get_agent_settings().language})
 
@@ -154,7 +155,7 @@ if __name__ == "__main__":
     options = WorkerOptions(
         entrypoint_fnc=entrypoint,
         prewarm_fnc=prewarm,
-        # prewarm loads Silero and Whisper; a replacement process spawned
+        # prewarm loads Silero and any local Whisper; a replacement process spawned
         # while a call is using the CPU can take longer than the 10 s default.
         # Past it, livekit-agents kills the process with SIGUSR1, which is
         # logged as "process exited with non-zero exit code -10".

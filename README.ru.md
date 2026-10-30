@@ -29,7 +29,7 @@ Web Speech API.
 
 Два процесса в одном репозитории:
 
-1. **HTTP API** (`src/main.py`) — тонкий сервер токенов: `GET /health/*` и `POST /token`,
+1. **HTTP API** (`src/main.py`) — тонкий сервер токенов: `GET /health/*` и `POST /api/v1/token`,
    возвращающий LiveKit-JWT, чтобы браузер подключился к комнате напрямую через WebRTC. Бизнес-логики
    бронирования тут нет.
 2. **Agent worker** (`src/entrypoint.py`) — сам голосовой агент: подключается к комнате, крутит
@@ -168,6 +168,6 @@ uv sync && uv run ruff check . && uv run mypy src
 uv run pytest --cov=src/app/services --cov-report=term-missing
 ```
 
-165 тестов, ~97% покрытия слоя services. Ни базы, ни сети: порт `BookingGateway` заменяется
+335 тестов, ~98% покрытия слоя services. Ни базы, ни сети: порт `BookingGateway` заменяется
 in-memory фейком (его вторая реализация), так что весь набор идёт офлайн. CI гоняет те же команды на
 каждый push.

@@ -7,9 +7,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class WorkerSettings(BaseSettings):
     """How many calls the agent worker keeps ready, how big one may grow, and where it is scraped.
 
-    Each prewarmed process holds its own Whisper, Silero and turn model, about
-    640 MB. livekit-agents defaults to one per CPU up to four, which on a 4-vCPU
-    host is 2.5 GB spent waiting for calls a portfolio rarely gets at once.
+    Each prewarmed process holds its own Silero, turn model and any local STT
+    model (a faster_whisper fallback included), about 640 MB with Whisper small.
+    livekit-agents defaults to one per CPU up to four, which on a 4-vCPU host is
+    2.5 GB spent waiting for calls a portfolio rarely gets at once.
     """
 
     num_idle_processes: int = Field(

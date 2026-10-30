@@ -26,15 +26,16 @@ logger = getLogger(__name__)
 
 
 class OpenAICompatibleSTTClient(STTClient):
-    def __init__(self, settings: STTSettings, language: str, client: AsyncOpenAI) -> None:
+    def __init__(self, settings: STTSettings, language: str, model: str, client: AsyncOpenAI) -> None:
         super().__init__(capabilities=stt.STTCapabilities(streaming=False, interim_results=False))
         self._settings = settings
         self._language = settings.language or language
+        self._model = model
         self._client = client
 
     @property
     def model(self) -> str:
-        return self._settings.model
+        return self._model
 
     @property
     def provider(self) -> str:
@@ -56,7 +57,7 @@ class OpenAICompatibleSTTClient(STTClient):
                 # A filename is required by the multipart contract and the
                 # extension is how most servers detect the container.
                 file=("speech.wav", payload, "audio/wav"),
-                model=self._settings.model,
+                model=self._model,
                 language=target_language,
             )
         except OpenAIError as exc:

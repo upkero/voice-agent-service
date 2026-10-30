@@ -91,9 +91,9 @@ def build_session(language: str, vad: vad_module.VAD | None = None) -> AgentSess
             #
             # Without the model (no AVX2) silence alone ends the turn. Silero
             # reports end of speech after 0.55 s of it; 0.8 s from the last word
-            # rides out a short "um" before a date or a name, and Whisper is
-            # still transcribing for most of that wait, so the guest barely pays
-            # for it.
+            # rides out a short "um" before a date or a name, and the STT is
+            # still finalising the transcript for most of that wait, so the guest
+            # barely pays for it.
             "endpointing": {"min_delay": 0.4 if turn_model else 0.8, "max_delay": 2.0},
             # Start drafting the reply (and any tool call) while the final
             # transcript is still settling, instead of after. Overlaps the LLM
@@ -167,10 +167,10 @@ async def start_session(
             agent=agent,
             room=ctx.room,
             room_options=room_io.RoomOptions(
-                # Text input is not only a fallback. It is what makes the
-                # degraded path an actual conversation: typed messages enter the
-                # same LLM and the same tools, so a guest with no working
-                # microphone can still book a table.
+                # Typed messages enter the same LLM and the same tools, so a
+                # client with a text box can book with no working microphone.
+                # The demo's call screen has none, which is why the degradation
+                # notices ask the guest to call back rather than to type.
                 text_input=True,
                 audio_input=True,
             ),
