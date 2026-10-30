@@ -16,7 +16,8 @@ from typing import Any
 from uuid import UUID
 
 import httpx
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor, RequestInfo
+from opentelemetry.trace import Span
 
 from src.app.contracts.booking import BookingDTO, BookingStatus, SlotDTO
 from src.app.core.metrics import OPS_CORE_DURATION
@@ -263,6 +264,11 @@ def _route(path: str) -> str:
     return "/api/v1/bookings/{id}" if path.startswith("/api/v1/bookings/") else path
 
 
+async def _name_span(span: Span, request: RequestInfo) -> None:
+    """`ops-core GET /api/v1/bookings`: who was called and for what, not a bare `GET`."""
+    span.update_name(f"ops-core {request.method.decode()} {_route(request.url.path)}")
+
+
 async def _inject_request_id(request: httpx.Request) -> None:
     """Carry the caller's request id into ops-core-api's logs.
 
@@ -293,5 +299,5 @@ def create_booking_gateway(
     # A client span per request and a `traceparent` header, so ops-core-api's
     # server span becomes a child of the booking tool that called it. The
     # X-Request-ID hook stays: logs join on it, and not every log has a trace.
-    HTTPXClientInstrumentor().instrument_client(client)
+    HTTPXClientInstrumentor().instrument_client(client, request_hook=_name_span)
     return CoreApiBookingGateway(settings, client)

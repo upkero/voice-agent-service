@@ -57,13 +57,16 @@ async def test_find_booking_span_sits_under_the_tool_and_above_ops_core(spans: I
 
     assert result["ok"] is True
     finished = spans.get_finished_spans()
-    find = next(span for span in finished if span.name == "booking.find_booking")
+    find = next(span for span in finished if span.name == "tool.find_booking")
     assert find.parent is not None
     assert find.parent.span_id == tool_span.get_span_context().span_id
     assert find.attributes is not None
     assert find.attributes["booking.guest_name"] == "Иванову"
     assert find.attributes["booking.results.count"] == 1
     assert find.attributes["booking.result"] == "ok"
+    request = next(span for span in finished if span.name == "ops-core GET /api/v1/bookings")
+    assert request.parent is not None
+    assert request.parent.span_id == find.context.span_id
 
     traceparent = seen[0].headers["traceparent"]
     assert traceparent.split("-")[1] == format(find.context.trace_id, "032x")

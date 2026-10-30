@@ -226,12 +226,12 @@ _SPAN_ATTRIBUTES: Final[dict[str, str]] = {
 def _traced(
     method: Callable[["BookingTools", dict[str, Any]], Awaitable[dict[str, Any]]],
 ) -> Callable[["BookingTools", dict[str, Any]], Awaitable[dict[str, Any]]]:
-    """A `booking.<tool>` span under the framework's function_tool span.
+    """A `tool.<name>` span under the framework's function_tool span.
 
     Ours, because function_tool only knows the raw arguments and the rendered
     output; the result code and the ops-core call are what an incident needs.
     """
-    name = f"booking.{method.__name__}"
+    name = f"tool.{method.__name__}"
 
     @functools.wraps(method)
     async def traced(self: "BookingTools", raw: dict[str, Any]) -> dict[str, Any]:
