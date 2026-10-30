@@ -27,7 +27,6 @@ from src.app.core.settings.logging import get_logging_settings
 from src.app.core.settings.stt import get_stt_settings
 from src.app.core.settings.tts import get_tts_settings
 from src.app.core.settings.worker import get_worker_settings
-from src.app.core.telemetry import setup_tracing
 from src.app.voice.call_stats import CallStats
 from src.app.voice.confirmation import ConfirmationTracker
 from src.app.voice.degradation import DegradationNotice
@@ -40,6 +39,7 @@ from src.app.voice.session import (
     register_degradation_notices,
     start_session,
 )
+from src.app.voice.tracing import setup_worker_tracing
 
 logger = getLogger(__name__)
 
@@ -59,7 +59,7 @@ def prewarm(proc: JobProcess) -> None:
     # started on a no-op tracer. livekit gets the provider too, because its
     # shutdown flushes only the one it holds; otherwise a call's last spans die
     # with its process.
-    telemetry.set_tracer_provider(setup_tracing("voice-agent", "voice-agent-service"))
+    telemetry.set_tracer_provider(setup_worker_tracing())
     # After livekit has emptied the multiprocess directory, which it does when the worker
     # starts and before the first process: earlier, these zeros would be deleted with it.
     preinitialise(get_args(AgentLanguage))

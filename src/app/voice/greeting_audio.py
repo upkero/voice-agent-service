@@ -18,6 +18,7 @@ from logging import getLogger
 from typing import get_args
 
 from livekit import rtc
+from opentelemetry.instrumentation.utils import suppress_instrumentation
 
 from src.app.core.settings.agent import AgentLanguage, AgentSettings
 from src.app.core.settings.tts import TTSSettings
@@ -70,7 +71,9 @@ def prewarm_greetings(agent_settings: AgentSettings, tts_settings: TTSSettings) 
     async def run() -> None:
         await asyncio.gather(*(_prepare(agent_settings, tts_settings, lang) for lang in get_args(AgentLanguage)))
 
-    asyncio.run(run())
+    # Not part of any call, so not traced: CollapsingSpanProcessor drops what starts here.
+    with suppress_instrumentation():
+        asyncio.run(run())
 
 
 def prewarm_greetings_in_background(agent_settings: AgentSettings, tts_settings: TTSSettings) -> None:
