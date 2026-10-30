@@ -18,15 +18,15 @@ from opentelemetry.trace import SpanContext
 
 from src.app.core.telemetry import setup_tracing
 
-# The retry attempt under every request, the fallback and stream adapters around the
-# provider's own request, and the activity wrappers around on_enter / on_exit. Each
-# request's error is also recorded on the kept span around it, so none is lost.
+# The TTS retry attempt, the fallback and stream adapters around the provider's own
+# request, and the activity wrappers around on_enter / on_exit. Each request's error
+# is also recorded on the kept span around it, so none is lost. llm_request_run stays:
+# portfolio-deploy's collector counts it into the voice LLM error metric (A9, A17).
 WRAPPERS = frozenset(
     {
         "tts_stream_adapter",
         "tts_request_run",
         "tts_fallback_adapter",
-        "llm_request_run",
         "start_agent_activity",
         "drain_agent_activity",
     }
