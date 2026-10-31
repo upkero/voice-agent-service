@@ -170,13 +170,11 @@ class CoreApiBookingGateway(BookingGateway):
                 extra={"attempts": self._settings.max_attempts},
             )
             if exc.response is not None and exc.response.status_code == httpx.codes.TOO_MANY_REQUESTS:
-                # Still throttled after the last attempt. Reporting this as
-                # "upstream is broken" would throw away the only actionable
-                # thing we were told, so the 429 and its Retry-After travel on.
-                retry_after = exc.response.headers.get("Retry-After")
-                raise CoreRateLimitedError(
-                    headers={"Retry-After": retry_after} if retry_after else None,
-                ) from exc
+                # Still throttled after the last attempt: "busy, try shortly" is a
+                # different phrase for the guest from "the diary is down". No
+                # Retry-After is passed on, because no HTTP caller ever sees this
+                # error: the booking tools turn it into speech.
+                raise CoreRateLimitedError() from exc
             raise CoreUnavailableError() from exc
 
     async def _send_once(

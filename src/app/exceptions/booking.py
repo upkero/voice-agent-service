@@ -35,8 +35,7 @@ class CoreRateLimitedError(BookingError):
     """ops-core-api is throttling us, and still was after the last attempt.
 
     Kept apart from CoreUnavailableError on purpose: "wait and try again" is a
-    different fact from "it is broken", and it is the only one that comes with a
-    number attached. The `Retry-After` the upstream sent travels on `headers`.
+    different fact from "it is broken", and the guest is told something different.
     """
 
     status_code = 429

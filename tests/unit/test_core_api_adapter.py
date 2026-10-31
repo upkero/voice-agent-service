@@ -29,7 +29,7 @@ def _repository(handler: httpx.MockTransport) -> CoreApiBookingGateway:
     return CoreApiBookingGateway(SETTINGS, client)
 
 
-async def test_exhausted_429_surfaces_as_429_with_retry_after() -> None:
+async def test_exhausted_429_surfaces_as_rate_limited() -> None:
     """A throttled upstream must not be reported as a broken one."""
     calls = 0
 
@@ -45,7 +45,6 @@ async def test_exhausted_429_surfaces_as_429_with_retry_after() -> None:
 
     assert calls == SETTINGS.max_attempts
     assert caught.value.status_code == 429
-    assert caught.value.headers["Retry-After"] == "0"
 
 
 async def test_exhausted_503_still_surfaces_as_unavailable() -> None:
