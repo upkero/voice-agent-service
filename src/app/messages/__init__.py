@@ -11,19 +11,25 @@ They are also what the agent says when the model is not usable at all: a failed
 tool call and a dead audio leg both have to produce words without asking a
 provider for them.
 
-Data, not subclasses. The dialogue *skeleton* is a Template Method because its
-steps genuinely differ between flows; the wording differs only by language, and
-a class per locale would be ceremony around a dictionary.
+Data, not subclasses: the wording differs only by language, and a class per
+locale would be ceremony around a dictionary. A language without a table falls
+back to English.
 """
 
 import random
+from collections.abc import Mapping
 from datetime import date
 from typing import Final
 
 _FALLBACK_LANGUAGE = "en"
 
-# Keyed by our own error_code values, so a new failure mode without a phrase is
-# a visible KeyError in tests rather than a mute agent in production.
+
+def _for[T](table: Mapping[str, T], language: str) -> T:
+    return table.get(language) or table[_FALLBACK_LANGUAGE]
+
+
+# Keyed by our own error_code values. A code without a phrase is spoken as
+# "booking_error" (see phrase()), so a new failure mode is never a mute agent.
 #
 # Every entry is a sentence a person would say. "Error 503" is not one, and
 # neither is silence — a guest on a phone call cannot see a spinner, so a
@@ -164,67 +170,38 @@ STT_VOCABULARY: Final[dict[str, str]] = {
 
 
 def stt_vocabulary(language: str) -> str:
-    return STT_VOCABULARY.get(language) or STT_VOCABULARY[_FALLBACK_LANGUAGE]
+    return _for(STT_VOCABULARY, language)
 
 
 def filler_line(language: str, tool: str) -> str:
-    table = FILLERS.get(language) or FILLERS[_FALLBACK_LANGUAGE]
-    return random.choice(table[tool])
+    return random.choice(_for(FILLERS, language)[tool])
 
 
 def greeting_line(language: str, agent_name: str, venue_name: str) -> str:
-    template = GREETINGS.get(language) or GREETINGS[_FALLBACK_LANGUAGE]
-    return template.format(agent_name=agent_name, venue_name=venue_name)
+    return _for(GREETINGS, language).format(agent_name=agent_name, venue_name=venue_name)
 
 
 def phrase(language: str, code: str, **fields: str) -> str:
-    """Look up a sentence, falling back to English rather than to nothing.
+    """Look up a sentence: the language's own, else English, else "booking_error".
 
     `fields` fill the placeholders of the few sentences that have any.
     """
-    table = ERROR_PHRASES.get(language) or ERROR_PHRASES[_FALLBACK_LANGUAGE]
-    text = table.get(code) or ERROR_PHRASES[_FALLBACK_LANGUAGE].get(code, ERROR_PHRASES["en"]["booking_error"])
+    fallback = ERROR_PHRASES[_FALLBACK_LANGUAGE]
+    text = _for(ERROR_PHRASES, language).get(code) or fallback.get(code) or fallback["booking_error"]
     return text.format(**fields) if fields else text
 
 
-_MONTHS: Final[dict[str, tuple[str, ...]]] = {
-    "ru": (
-        "января",
-        "февраля",
-        "марта",
-        "апреля",
-        "мая",
-        "июня",
-        "июля",
-        "августа",
-        "сентября",
-        "октября",
-        "ноября",
-        "декабря",
-    ),
-    "en": (
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    ),
+# Space-separated, January first; spoken_date() splits them.
+_MONTHS: Final[dict[str, str]] = {
+    "ru": "января февраля марта апреля мая июня июля августа сентября октября ноября декабря",
+    "en": "January February March April May June July August September October November December",
 }
 
 
 def spoken_date(language: str, day: date) -> str:
     """A date as it is read aloud ("24 июля"), not "2026-07-24", which a voice reads digit by digit."""
-    months = _MONTHS.get(language) or _MONTHS[_FALLBACK_LANGUAGE]
-    return f"{day.day} {months[day.month - 1]}"
+    return f"{day.day} {_for(_MONTHS, language).split()[day.month - 1]}"
 
 
 def degradation_message(language: str, kind: str) -> str:
-    table = DEGRADATION_MESSAGES.get(language) or DEGRADATION_MESSAGES[_FALLBACK_LANGUAGE]
-    return table.get(kind) or DEGRADATION_MESSAGES[_FALLBACK_LANGUAGE][kind]
+    return _for(DEGRADATION_MESSAGES, language).get(kind) or DEGRADATION_MESSAGES[_FALLBACK_LANGUAGE][kind]
