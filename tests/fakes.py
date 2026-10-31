@@ -169,11 +169,8 @@ class CancelledReplayGateway(FakeBookingGateway):
 
 
 class FakeLiveKitGateway(LiveKitGateway):
-    """Readiness without a LiveKit server on the other end.
-
-    The reason the probe became a port: before it did, /health/ready could only
-    be exercised by standing one up.
-    """
+    """Readiness without a LiveKit server on the other end, so /health/ready is
+    tested without standing one up."""
 
     def __init__(self, reachable: bool = True) -> None:
         self.reachable = reachable

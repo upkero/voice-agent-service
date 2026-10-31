@@ -116,9 +116,7 @@ def register_degradation_notices(session: AgentSession[Any], notice: Degradation
     announcing "I can't hear you" on one of those is worse than saying nothing.
 
     Registered on the session rather than on the STT/TTS objects because the
-    session is where both arrive, and because a mid-conversation voice failure
-    had no announcement at all before this — only a greeting that failed to
-    speak did.
+    session is where both arrive.
     """
     # livekit calls listeners synchronously, so announcing has to be scheduled.
     # Holding the reference keeps the task from being garbage-collected mid-flight.

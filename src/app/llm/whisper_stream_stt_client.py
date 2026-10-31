@@ -1,4 +1,4 @@
-"""Adapter: a self-hosted WhisperLive server behind the project's STT port, streaming.
+"""Adapter: a self-hosted WhisperLive server behind livekit's stt.STT, streaming.
 
 This is the "build your own streaming STT" path. The naive way to fake streaming
 on a batch API is to slice the audio and transcribe the pieces independently —

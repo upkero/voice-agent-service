@@ -1,4 +1,4 @@
-"""Adapter: a local Whisper model behind the project's STT port.
+"""Adapter: a local Whisper model behind livekit's stt.STT.
 
 This is the offline default, and the reason the demo needs no account
 anywhere. It also makes the Factory above it honest — two real products, not

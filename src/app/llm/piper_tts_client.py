@@ -1,4 +1,4 @@
-"""Adapter: the piper binary behind the project's TTS port.
+"""Adapter: the piper binary behind livekit's tts.TTS.
 
 The offline default voice. Piper is driven as a subprocess rather than through
 the `piper-tts` wheel deliberately: the wheel drags in phonemiser and

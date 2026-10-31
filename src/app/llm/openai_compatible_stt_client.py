@@ -1,4 +1,4 @@
-"""Adapter: any OpenAI-compatible transcription API behind the project's STT port.
+"""Adapter: any OpenAI-compatible transcription API behind livekit's stt.STT.
 
 Generic on purpose. No provider is named in this file — the endpoint comes from
 STT_BASE_URL, so pointing it at OpenRouter, OpenAI itself, a self-hosted

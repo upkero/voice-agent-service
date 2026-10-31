@@ -1,15 +1,13 @@
-"""Adapter: any OpenAI-compatible speech API behind the project's TTS port.
+"""Adapter: any OpenAI-compatible speech API behind livekit's tts.TTS.
 
 The mirror image of the STT client, and generic for the same reason: no
 provider is named here, the endpoint is TTS_BASE_URL, and switching from
 OpenRouter to OpenAI to a local server is a value in .env.
 
-Note what this is *not*. A provider with its own request shape — Cartesia, say —
-is not "OpenAI-compatible" merely because it also returns audio. It belongs in
-its own tts.TTS subclass, added alongside this one
-and selected by a new branch in the factory. That is the Open/Closed part: a
-third provider changes two files that exist for choosing providers, and no
-other line of this service.
+A provider with its own request shape is not "OpenAI-compatible" merely
+because it also returns audio. It gets its own branch in the factory, and its
+own tts.TTS subclass unless livekit already ships one: Cartesia's plugin is
+used directly.
 """
 
 from typing import Any, Literal, cast

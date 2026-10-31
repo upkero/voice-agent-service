@@ -21,7 +21,7 @@ from src.app.core.telemetry import setup_tracing
 # The TTS retry attempt, the fallback and stream adapters around the provider's own
 # request, and the activity wrappers around on_enter / on_exit. Each request's error
 # is also recorded on the kept span around it, so none is lost. llm_request_run stays:
-# portfolio-deploy's collector counts it into the voice LLM error metric (A9, A17).
+# portfolio-deploy's collector counts it into the voice LLM error metric.
 WRAPPERS = frozenset(
     {
         "tts_stream_adapter",
