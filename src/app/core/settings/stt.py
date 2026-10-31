@@ -1,5 +1,4 @@
 from functools import lru_cache
-from logging import getLogger
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -23,14 +22,6 @@ DEFAULT_STT_MODELS: dict[STTProvider, str] = {
     "deepgram": "nova-3",
     "whisper_stream": "small",
 }
-
-# Whisper model sizes, for recognising the legacy layout below.
-_WHISPER_SIZES = frozenset(
-    {"tiny", "base", "small", "medium", "large", "large-v1", "large-v2", "large-v3", "large-v3-turbo", "turbo"}
-    | {f"{size}.en" for size in ("tiny", "base", "small", "medium")}
-)
-
-logger = getLogger(__name__)
 
 
 class STTSettings(BaseSettings):
@@ -125,7 +116,6 @@ class STTSettings(BaseSettings):
             # primary, so this is the ordinary case rather than a mistake. A
             # FallbackAdapter over one provider twice would only retry itself.
             self.fallback_provider = None
-        self._migrate_shared_model()
 
         providers = {self.provider, self.fallback_provider}
         if "openai_compatible" in providers and not self.base_url:
@@ -135,28 +125,6 @@ class STTSettings(BaseSettings):
         if "whisper_stream" in providers and not self.whisper_stream_url:
             raise ValueError("STT_WHISPER_STREAM_URL is required when STT uses the whisper_stream provider.")
         return self
-
-    def _migrate_shared_model(self) -> None:
-        """Read the layout from before STT_FALLBACK_MODEL existed.
-
-        STT_MODEL used to serve both providers, so an .env pairing a Deepgram
-        primary with a Whisper fallback set STT_MODEL to a Whisper size. Deepgram
-        has no model of that name, so the value can only have been meant for the
-        fallback: it moves there, and the primary takes its own default. Nothing
-        else is reinterpreted; an explicit STT_FALLBACK_MODEL switches this off.
-        """
-        if (
-            self.provider == "deepgram"
-            and self.fallback_provider in ("faster_whisper", "whisper_stream")
-            and self.fallback_model is None
-            and self.model in _WHISPER_SIZES
-        ):
-            logger.warning(
-                "STT_MODEL=%s is a Whisper size and the primary is deepgram: using it as "
-                "STT_FALLBACK_MODEL and Deepgram's default as STT_MODEL. Set both explicitly.",
-                self.model,
-            )
-            self.fallback_model, self.model = self.model, None
 
     def model_for(self, provider: STTProvider) -> str:
         """The model to load for the primary or the fallback provider."""

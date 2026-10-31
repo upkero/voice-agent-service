@@ -89,22 +89,6 @@ def test_an_unset_model_is_the_providers_default() -> None:
     assert settings.model_for("faster_whisper") == "small"
 
 
-def test_a_whisper_size_with_a_deepgram_primary_is_read_as_the_fallback_model() -> None:
-    """The .env from before STT_FALLBACK_MODEL: STT_MODEL=small served both providers."""
-    settings = _stt(provider="deepgram", api_key="dg", model="small", fallback_provider="faster_whisper")
-
-    assert settings.model_for("deepgram") == "nova-3"
-    assert settings.model_for("faster_whisper") == "small"
-
-
-def test_an_explicit_fallback_model_turns_the_legacy_reading_off() -> None:
-    settings = _stt(
-        provider="deepgram", api_key="dg", model="small", fallback_provider="faster_whisper", fallback_model="base"
-    )
-
-    assert settings.model_for("deepgram") == "small"
-
-
 def test_a_provider_that_is_not_configured_has_no_model() -> None:
     with pytest.raises(ValueError, match="neither"):
         _stt(provider="faster_whisper").model_for("deepgram")
@@ -112,7 +96,7 @@ def test_a_provider_that_is_not_configured_has_no_model() -> None:
 
 def test_the_deepgram_client_gets_the_deepgram_model_not_the_whisper_one() -> None:
     client = create_stt(
-        _stt(provider="deepgram", api_key="dg", model="small", fallback_provider="faster_whisper"),
+        _stt(provider="deepgram", api_key="dg", fallback_provider="faster_whisper", fallback_model="small"),
         "ru",
         vad=Mock(spec=vad_module.VAD),
     )
