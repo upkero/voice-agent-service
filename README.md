@@ -75,9 +75,8 @@ ops-core-api. Full description and the patterns table in [`docs/architecture.md`
 | Pattern | Where |
 |---|---|
 | **Adapter** | HTTP client to ops-core-api behind the `BookingGateway` port; local model/binary behind livekit's STT/TTS. |
-| **Factory** | One constructor each for the dialogue LLM, the STT client and the TTS client — provider chosen by settings. |
-| **Strategy** | Slot ranking (nearest-time vs earliest-first), injected into `ReservationService`. |
-| **Template Method** | The dialogue system prompt: fixed section order, overridable steps. |
+| **Factory** | The STT and TTS clients: provider chosen by settings. |
+| **Failover** | livekit's `FallbackAdapter` pairs a primary STT/TTS with an offline fallback. |
 
 ## Quick start
 

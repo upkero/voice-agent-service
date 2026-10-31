@@ -57,7 +57,7 @@ second implementation that proves it.
 |---|---|---|
 | `contracts/` | Frozen `slots=True` dataclasses passed between layers | Never imports schemas, api, or services |
 | `schemas/` | Pydantic models at the HTTP boundary | Converted to contracts in the router; never passed down |
-| `interfaces/` | ABC ports (`BookingGateway`, `LiveKitGateway`, `STTClient`, `TTSClient`, `SlotRankingStrategy`) | Services depend on these, not on concrete classes |
+| `interfaces/` | ABC ports (`BookingGateway`, `LiveKitGateway`) | Services depend on these, not on concrete classes |
 | `gateways/` | HTTP adapters to other services: ops-core-api, the LiveKit management API | Return contracts, raise typed exceptions, let no `httpx`/`aiohttp` type escape |
 | `llm/` | Factories + concrete STT/TTS/LLM clients | The only place a provider client is constructed |
 | `prompts/` | Model-facing text as `.md`, loaded at import | English only; the reply language is a placeholder |
@@ -74,10 +74,8 @@ second implementation that proves it.
 |---|---|---|
 | **Adapter** | `gateways/core_api_booking.py` | Makes an HTTP service satisfy a database-shaped port. |
 | **Adapter** | `llm/faster_whisper_stt_client.py`, `llm/piper_tts_client.py` | Wrap a local model / local binary behind livekit's `stt.STT` / `tts.TTS`. |
-| **Factory** | `llm/factory.py`, `llm/stt_factory.py`, `llm/tts_factory.py` | The one place each provider client is built; provider chosen by settings, never by calling code. |
-| **Strategy** | `interfaces/booking/slot_ranking_strategy.py` + `services/booking/ranking.py` | How free slots are ranked against a requested time; a second rule adds a class, not an `if`. |
-| **Template Method** | `services/dialog/flow.py` | Fixes the order of the system prompt's sections; a subclass overrides a step but cannot reshuffle the skeleton. |
-| **Strategy (fallback)** | `stt.FallbackAdapter` / `tts.FallbackAdapter` wired in the factories | `*_FALLBACK_PROVIDER` pairs two implementations and defaults to the offline one, so a cloud primary fails over to local faster-whisper / piper at runtime rather than to silence. |
+| **Factory** | `llm/stt_factory.py`, `llm/tts_factory.py` | The one place each provider client is built; provider chosen by settings, never by calling code. `llm/factory.py` is a plain constructor: every LLM provider is the same `openai.LLM`. |
+| **Failover** | `stt.FallbackAdapter` / `tts.FallbackAdapter` wired in the factories | `*_FALLBACK_PROVIDER` pairs two implementations and defaults to the offline one, so a cloud primary fails over to local faster-whisper / piper at runtime rather than to silence. |
 
 ### Streaming vs batch is a declared capability, not a branch
 
