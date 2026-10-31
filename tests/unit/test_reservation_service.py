@@ -8,7 +8,6 @@ import pytest
 from src.app.core.settings.core_api import CoreApiSettings
 from src.app.exceptions.booking import CoreUnavailableError, SlotCapacityError, WrongBookingCodeError
 from src.app.gateways.core_api_booking import CoreApiBookingGateway
-from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import MAX_OFFERS, ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
 from tests.fakes import CODE_KEY, TOMORROW, FakeBookingGateway, UnavailableBookingGateway, make_slot
@@ -39,7 +38,7 @@ async def test_offers_exclude_tables_that_are_too_small(
 async def test_tables_sharing_a_time_are_offered_once_as_the_smallest_that_fits(state: DialogSessionState) -> None:
     """Three free tables at 20:00 are one offer, not "eight, eight or eight"."""
     slots = [make_slot(20, 0, 8), make_slot(20, 0, 4), make_slot(20, 0, 6), make_slot(18, 0, 4)]
-    service = ReservationService(FakeBookingGateway(slots), NearestTimeRanking(), CODE_KEY)
+    service = ReservationService(FakeBookingGateway(slots), CODE_KEY)
 
     offers = await service.find_offers(state, TOMORROW, party_size=4, preferred_time=time(20, 0))
 
@@ -49,7 +48,7 @@ async def test_tables_sharing_a_time_are_offered_once_as_the_smallest_that_fits(
 async def test_with_no_time_named_the_offers_span_the_day(state: DialogSessionState) -> None:
     """Three earliest would always be lunch; a guest wanting the evening should hear one."""
     slots = [make_slot(hour, 0, 4) for hour in (12, 13, 14, 18, 19, 20, 21)]
-    service = ReservationService(FakeBookingGateway(slots), NearestTimeRanking(), CODE_KEY)
+    service = ReservationService(FakeBookingGateway(slots), CODE_KEY)
 
     offers = await service.find_offers(state, TOMORROW, party_size=2, preferred_time=None)
 
@@ -60,7 +59,7 @@ async def test_a_bigger_party_than_the_offered_table_gets_a_table_that_fits(stat
     """Checked for two, booked for four: same time, the smallest table that seats four."""
     two, four, six = make_slot(18, 0, 2), make_slot(18, 0, 4), make_slot(18, 0, 6)
     gateway = FakeBookingGateway([two, four, six])
-    service = ReservationService(gateway, NearestTimeRanking(), CODE_KEY)
+    service = ReservationService(gateway, CODE_KEY)
     offers = await service.find_offers(state, TOMORROW, party_size=2, preferred_time=time(18, 0))
     assert offers[0].slot.id == two.id
 
@@ -72,7 +71,7 @@ async def test_a_bigger_party_than_the_offered_table_gets_a_table_that_fits(stat
 
 async def test_no_table_that_fits_at_that_time_is_a_capacity_error(state: DialogSessionState) -> None:
     gateway = FakeBookingGateway([make_slot(18, 0, 2), make_slot(20, 0, 6)])
-    service = ReservationService(gateway, NearestTimeRanking(), CODE_KEY)
+    service = ReservationService(gateway, CODE_KEY)
     offers = await service.find_offers(state, TOMORROW, party_size=2, preferred_time=time(18, 0))
 
     with pytest.raises(SlotCapacityError):
@@ -83,7 +82,7 @@ async def test_no_table_that_fits_at_that_time_is_a_capacity_error(state: Dialog
 async def test_offers_are_capped(state: DialogSessionState) -> None:
     """A guest cannot hold a read-out list of six times in their head."""
     many = [make_slot(hour, 0, 6) for hour in range(12, 22)]
-    service = ReservationService(FakeBookingGateway(many), NearestTimeRanking(), CODE_KEY)
+    service = ReservationService(FakeBookingGateway(many), CODE_KEY)
 
     offers = await service.find_offers(state, TOMORROW, party_size=2, preferred_time=None)
 
@@ -123,7 +122,7 @@ async def test_reserving_an_unoffered_reference_never_reaches_the_repository(
 
 
 async def test_core_outage_surfaces_as_a_typed_failure(state: DialogSessionState) -> None:
-    service = ReservationService(UnavailableBookingGateway(), NearestTimeRanking(), CODE_KEY)
+    service = ReservationService(UnavailableBookingGateway(), CODE_KEY)
 
     with pytest.raises(CoreUnavailableError):
         await service.find_offers(state, TOMORROW, party_size=2, preferred_time=None)
@@ -237,7 +236,7 @@ async def test_every_page_of_the_day_is_searched() -> None:
         CoreApiSettings(api_key="test-key-1234567890"),
         httpx.AsyncClient(transport=httpx.MockTransport(respond), base_url="http://core.test"),
     )
-    service = ReservationService(gateway, NearestTimeRanking(), CODE_KEY)
+    service = ReservationService(gateway, CODE_KEY)
 
     with patch("src.app.gateways.core_api_booking._SLOT_PAGE_SIZE", 2):
         found = await service.find_existing(DialogSessionState("later-call"), "Андрея", TOMORROW)

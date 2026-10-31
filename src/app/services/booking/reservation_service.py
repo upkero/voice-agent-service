@@ -19,9 +19,9 @@ from src.app.exceptions.booking import (
     SlotCapacityError,
     WrongBookingCodeError,
 )
-from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
 from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.services.booking.name_match import names_match
+from src.app.services.booking.ranking import rank_slots
 from src.app.services.dialog.session_state import DialogSessionState
 
 logger = getLogger(__name__)
@@ -33,9 +33,8 @@ MAX_OFFERS = 3
 
 
 class ReservationService:
-    def __init__(self, bookings: BookingGateway, ranking: SlotRankingStrategy, code_key: bytes) -> None:
+    def __init__(self, bookings: BookingGateway, code_key: bytes) -> None:
         self._bookings = bookings
-        self._ranking = ranking
         self._code_key = code_key
 
     async def find_offers(
@@ -58,7 +57,7 @@ class ReservationService:
         smallest: dict[time, SlotDTO] = {}
         for slot in sorted(slots, key=lambda slot: slot.capacity):
             smallest.setdefault(slot.slot_time, slot)
-        ranked = self._ranking.rank(list(smallest.values()), preferred_time)
+        ranked = rank_slots(list(smallest.values()), preferred_time)
         if preferred_time is None and len(ranked) > MAX_OFFERS:
             # No time named: the first three would always be lunch. Spread the
             # offers over the day instead (earliest, middle, latest), so a guest

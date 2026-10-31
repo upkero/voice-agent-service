@@ -15,7 +15,6 @@ import pytest
 from src.app.contracts.booking import SlotDTO
 from src.app.core.settings.agent import AgentSettings
 from src.app.messages import phrase
-from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import TOOL_SCHEMAS, BookingTools
@@ -145,7 +144,7 @@ async def test_an_outage_becomes_a_sentence_rather_than_an_exception(
     # Inject the fixed clock like the shared `tools` fixture, so TOMORROW stays
     # a future date whatever the real calendar says when the suite runs.
     tools = BookingTools(
-        ReservationService(UnavailableBookingGateway(), NearestTimeRanking(), CODE_KEY),
+        ReservationService(UnavailableBookingGateway(), CODE_KEY),
         state,
         agent_settings,
         today=lambda: TOMORROW - timedelta(days=1),
@@ -211,7 +210,7 @@ async def test_a_hanging_backend_is_cut_off_and_phrased(
             return []
 
     tools = BookingTools(
-        ReservationService(HangingGateway(), NearestTimeRanking(), CODE_KEY),
+        ReservationService(HangingGateway(), CODE_KEY),
         state,
         agent_settings.model_copy(update={"tool_wait_seconds": 0.05}),
         today=lambda: TOMORROW - timedelta(days=1),

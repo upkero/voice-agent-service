@@ -14,10 +14,8 @@ from src.app.core.settings.core_api import get_core_api_settings
 from src.app.core.settings.livekit import get_livekit_settings
 from src.app.gateways.core_api_booking import create_booking_gateway
 from src.app.gateways.livekit_probe import LiveKitApiGateway
-from src.app.interfaces.booking.slot_ranking_strategy import SlotRankingStrategy
 from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.interfaces.livekit_gateway import LiveKitGateway
-from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.flow import RestaurantBookingFlow
 from src.app.services.token.access_token_service import AccessTokenService
@@ -42,18 +40,11 @@ class ApplicationContainer:
         return create_booking_gateway(get_core_api_settings())
 
     @cached_property
-    def slot_ranking(self) -> SlotRankingStrategy:
-        # The Strategy is chosen here and nowhere else. Switching the venue to
-        # EarliestFirstRanking is this one line; ReservationService never learns
-        # that anything changed.
-        return NearestTimeRanking()
-
-    @cached_property
     def reservation_service(self) -> ReservationService:
         # The ops-core key doubles as the booking-code key: whoever holds it can
         # cancel through ops-core directly, so it grants nothing new.
         code_key = get_core_api_settings().api_key.get_secret_value().encode()
-        return ReservationService(self.booking_gateway, self.slot_ranking, code_key)
+        return ReservationService(self.booking_gateway, code_key)
 
     @cached_property
     def dialog_flow(self) -> RestaurantBookingFlow:

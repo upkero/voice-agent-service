@@ -27,7 +27,6 @@ from tests import telemetry  # noqa: E402
 
 from src.app.api.v1.middleware.rate_limit import reset_rate_limit  # noqa: E402
 from src.app.core.settings.agent import AgentSettings  # noqa: E402
-from src.app.services.booking.ranking import NearestTimeRanking  # noqa: E402
 from src.app.services.booking.reservation_service import ReservationService  # noqa: E402
 from src.app.services.dialog.session_state import DialogSessionState  # noqa: E402
 from src.app.services.dialog.tools import BookingTools  # noqa: E402
@@ -62,7 +61,7 @@ def state() -> DialogSessionState:
 
 @pytest.fixture
 def reservations(repository: FakeBookingGateway) -> ReservationService:
-    return ReservationService(repository, NearestTimeRanking(), CODE_KEY)
+    return ReservationService(repository, CODE_KEY)
 
 
 @pytest.fixture

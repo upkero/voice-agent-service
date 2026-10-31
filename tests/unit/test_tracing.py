@@ -16,7 +16,6 @@ from src.app.core.settings.agent import AgentSettings
 from src.app.core.settings.core_api import CoreApiSettings
 from src.app.core.telemetry import guest_name_fp
 from src.app.gateways.core_api_booking import create_booking_gateway
-from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import BookingTools
@@ -44,7 +43,7 @@ async def test_find_booking_span_sits_under_the_tool_and_above_ops_core(spans: I
         CoreApiSettings(api_key="test-key-1234567890", base_url="http://core.test"), httpx.MockTransport(respond)
     )
     tools = BookingTools(
-        ReservationService(gateway, NearestTimeRanking(), CODE_KEY),
+        ReservationService(gateway, CODE_KEY),
         DialogSessionState("room-trace"),
         AgentSettings(language="en"),
         today=lambda: TOMORROW,

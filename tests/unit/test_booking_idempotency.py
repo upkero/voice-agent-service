@@ -10,7 +10,6 @@ from datetime import time
 import pytest
 
 from src.app.exceptions.booking import InactiveBookingError, SlotTakenError
-from src.app.services.booking.ranking import NearestTimeRanking
 from src.app.services.booking.reservation_service import ReservationService
 from src.app.services.dialog.session_state import DialogSessionState
 from tests.fakes import CODE_KEY, TOMORROW, CancelledReplayGateway, FakeBookingGateway
@@ -123,7 +122,7 @@ async def test_a_consumed_key_is_recovered_exactly_once(
 async def test_a_cancelled_booking_is_never_reported_as_a_confirmation(state: DialogSessionState) -> None:
     """Telling a guest they have a table when they do not is the worst outcome
     this service can produce, so it fails loudly instead."""
-    service = ReservationService(CancelledReplayGateway(), NearestTimeRanking(), CODE_KEY)
+    service = ReservationService(CancelledReplayGateway(), CODE_KEY)
     offers = await service.find_offers(state, TOMORROW, party_size=4, preferred_time=None)
 
     with pytest.raises(InactiveBookingError, match="cancelled"):
