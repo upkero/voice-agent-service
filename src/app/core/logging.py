@@ -9,11 +9,16 @@ from opentelemetry import trace
 from src.app.core.request_id import get_request_id
 from src.app.core.settings.logging import LoggingSettings
 
+# `color_message` is uvicorn's ANSI copy of the message, which would sit in every
+# JSON line next to the plain one.
 _STDLIB_ATTRS = frozenset(logging.LogRecord(
     "", 0, "", 0, "", (), None
-).__dict__.keys()) | {"message", "asctime"}
+).__dict__.keys()) | {"message", "asctime", "color_message"}
 
-_UVICORN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
+# uvicorn.access is left exactly as uvicorn configured it. `--no-access-log` switches that logger
+# off by removing its handlers and stopping propagation; re-enabling propagation here undid the
+# flag, and the container log was 90% access lines.
+_UVICORN_LOGGERS = ("uvicorn", "uvicorn.error")
 
 
 class _JsonFormatter(logging.Formatter):
