@@ -60,18 +60,12 @@ def _build_one(
         return PiperTTSClient(settings, voice)
 
     if provider == "openai_compatible":
-        from openai import AsyncOpenAI
-
+        from src.app.llm.factory import openai_client
         from src.app.llm.openai_compatible_tts_client import OpenAICompatibleTTSClient
 
         model = settings.model_for(provider)
         logger.info("TTS: OpenAI-compatible %s at %s", model, settings.base_url)
-        client = AsyncOpenAI(
-            api_key=settings.api_key or "not-needed",
-            base_url=settings.base_url,
-            timeout=settings.timeout_seconds,
-            max_retries=settings.max_retries,
-        )
+        client = openai_client(settings)
         # A cloud voice name is not a piper voice name, so the default map is not
         # consulted here; the provider's own voice must be set explicitly.
         return OpenAICompatibleTTSClient(model, settings.voice or "alloy", client)

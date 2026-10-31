@@ -65,17 +65,11 @@ def _build_one(provider: STTProvider, settings: STTSettings, language: str) -> s
         return FasterWhisperSTTClient(settings, language, model)
 
     if provider == "openai_compatible":
-        from openai import AsyncOpenAI
-
+        from src.app.llm.factory import openai_client
         from src.app.llm.openai_compatible_stt_client import OpenAICompatibleSTTClient
 
         logger.info("STT: OpenAI-compatible %s at %s", model, settings.base_url)
-        client = AsyncOpenAI(
-            api_key=settings.api_key or "not-needed",
-            base_url=settings.base_url,
-            timeout=settings.timeout_seconds,
-            max_retries=settings.max_retries,
-        )
+        client = openai_client(settings)
         return OpenAICompatibleSTTClient(settings, language, model, client)
 
     if provider == "deepgram":

@@ -1,4 +1,4 @@
-"""Factory for the dialogue LLM.
+"""Factory for the dialogue LLM, and the one place `AsyncOpenAI` is built.
 
 The one place an LLM client is constructed. Callers name a provider in settings
 and receive something that satisfies livekit's `llm.LLM`; nothing above this
@@ -14,16 +14,37 @@ that this plugin already is. The port is the right abstraction for a request /
 response service; it is the wrong one for a phone call.
 """
 
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlparse
 
 import httpx
 from livekit.agents import llm
 from livekit.plugins import openai
+from openai import AsyncOpenAI
 
 from src.app.core.settings.llm import LLMSettings
 from src.app.exceptions.llm import LLMConfigurationError
 from src.app.llm.cost_tap import tap_openrouter_cost
+
+
+class _OpenAICompatibleSettings(Protocol):
+    """The fields STTSettings and TTSSettings share for an OpenAI-compatible endpoint."""
+
+    api_key: str | None
+    base_url: str | None
+    timeout_seconds: float
+    max_retries: int
+
+
+def openai_client(settings: _OpenAICompatibleSettings) -> AsyncOpenAI:
+    """The SDK client for the OpenAI-compatible STT and TTS providers."""
+    # Local servers ignore the key, but the SDK refuses to start without one.
+    return AsyncOpenAI(
+        api_key=settings.api_key or "not-needed",
+        base_url=settings.base_url,
+        timeout=settings.timeout_seconds,
+        max_retries=settings.max_retries,
+    )
 
 
 def create_llm(settings: LLMSettings) -> llm.LLM[Any]:
