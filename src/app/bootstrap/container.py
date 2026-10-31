@@ -6,7 +6,6 @@ process therefore never constructs an STT model, and the worker never opens a
 token signer — each pays only for what it touches, from one wiring file.
 """
 
-import inspect
 from functools import cached_property
 
 from src.app.core.settings.agent import AgentSettings, get_agent_settings
@@ -51,19 +50,13 @@ class ApplicationContainer:
         return DialogFlow(self.agent_settings)
 
     async def close(self) -> None:
-        """Close whatever was actually built, once each.
+        """Close whatever was actually built.
 
         Duck-typed rather than a registry of closers: a dependency that owns a
         resource already knows how to release it, and a list of what to close is
         one more thing to forget to update.
         """
-        closed: set[int] = set()
         for dependency in tuple(self.__dict__.values()):
-            if id(dependency) in closed:
-                continue
             close = getattr(dependency, "close", None)
             if callable(close):
-                result = close()
-                if inspect.isawaitable(result):
-                    await result
-            closed.add(id(dependency))
+                await close()
