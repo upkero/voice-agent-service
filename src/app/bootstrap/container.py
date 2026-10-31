@@ -17,7 +17,7 @@ from src.app.gateways.livekit_probe import LiveKitApiGateway
 from src.app.interfaces.booking_gateway import BookingGateway
 from src.app.interfaces.livekit_gateway import LiveKitGateway
 from src.app.services.booking.reservation_service import ReservationService
-from src.app.services.dialog.flow import RestaurantBookingFlow
+from src.app.services.dialog.flow import DialogFlow
 from src.app.services.token.access_token_service import AccessTokenService
 
 
@@ -47,8 +47,8 @@ class ApplicationContainer:
         return ReservationService(self.booking_gateway, code_key)
 
     @cached_property
-    def dialog_flow(self) -> RestaurantBookingFlow:
-        return RestaurantBookingFlow(self.agent_settings)
+    def dialog_flow(self) -> DialogFlow:
+        return DialogFlow(self.agent_settings)
 
     async def close(self) -> None:
         """Close whatever was actually built, once each.

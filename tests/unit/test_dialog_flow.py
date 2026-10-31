@@ -1,21 +1,18 @@
-"""The dialogue skeleton and what it guarantees.
-
-The Template Method is here to protect an order, so the tests are about order
-and about the instructions that must survive any later editing of the persona.
-"""
+"""The system prompt's order, and the instructions that must survive any later
+editing of the persona."""
 
 from datetime import date
 
 import pytest
 
 from src.app.core.settings.agent import AgentSettings
-from src.app.services.dialog.flow import BaseDialogFlow, RestaurantBookingFlow
+from src.app.services.dialog.flow import DialogFlow
 
 TODAY = date(2026, 7, 23)
 
 
-def _flow(language: str = "en") -> RestaurantBookingFlow:
-    return RestaurantBookingFlow(AgentSettings(language=language), today=lambda: TODAY)
+def _flow(language: str = "en") -> DialogFlow:
+    return DialogFlow(AgentSettings(language=language), today=lambda: TODAY)
 
 
 def test_the_sections_are_assembled_in_a_fixed_order() -> None:
@@ -60,17 +57,14 @@ def test_a_booking_from_this_call_is_cancelled_without_a_lookup() -> None:
 
 @pytest.mark.parametrize(("language", "expected"), [("ru", "Russian"), ("en", "English")])
 def test_the_persona_states_the_language(language: str, expected: str) -> None:
-    assert expected in _flow(language).persona()
+    assert f"reply only in {expected}" in _flow(language).system_prompt()
 
 
 @pytest.mark.parametrize(("language", "expected"), [("ru", "Russian"), ("en", "English")])
 def test_the_greeting_names_the_reply_language_rather_than_being_translated(language: str, expected: str) -> None:
-    """One English instruction with a placeholder, not one file per language.
-
-    The greeting used to branch into a Russian string, which made it the only
-    translated prompt in the service — two texts to keep in step for an
-    instruction the guest never hears.
-    """
+    """One English instruction with a placeholder, not one file per language:
+    a translated copy is a second text to keep in step for an instruction the
+    guest never hears."""
     greeting = _flow(language).greeting()
 
     assert greeting.startswith("Greet the guest")
@@ -78,7 +72,7 @@ def test_the_greeting_names_the_reply_language_rather_than_being_translated(lang
 
 
 def test_the_venue_and_name_come_from_settings() -> None:
-    flow = RestaurantBookingFlow(
+    flow = DialogFlow(
         AgentSettings(language="ru", name="Nadia", venue_name="Bell & Anchor"),
         today=lambda: TODAY,
     )
@@ -89,7 +83,7 @@ def test_the_venue_and_name_come_from_settings() -> None:
 
 
 def test_an_english_call_uses_the_latin_name_and_says_it_in_the_greeting() -> None:
-    flow = RestaurantBookingFlow(
+    flow = DialogFlow(
         AgentSettings(_env_file=None, language="en", name="Мила", name_en="Mila", venue_name="Aurora"),
         today=lambda: TODAY,
     )
@@ -100,27 +94,10 @@ def test_an_english_call_uses_the_latin_name_and_says_it_in_the_greeting() -> No
 
 
 def test_a_russian_call_keeps_the_cyrillic_name() -> None:
-    flow = RestaurantBookingFlow(
+    flow = DialogFlow(
         AgentSettings(_env_file=None, language="ru", name="Мила", name_en="Mila", venue_name="Aurora"),
         today=lambda: TODAY,
     )
 
     assert flow.greeting_text() == "Здравствуйте, ресторан Aurora, меня зовут Мила. Слушаю вас."
 
-
-def test_a_subclass_can_replace_a_step_without_reordering_the_skeleton() -> None:
-    """The point of the pattern: steps are open, the sequence is not."""
-
-    class TerseFlow(RestaurantBookingFlow):
-        def persona(self) -> str:
-            return "receptionist, briefly"
-
-    prompt = TerseFlow(AgentSettings(language="en"), today=lambda: TODAY).system_prompt()
-
-    assert prompt.startswith("receptionist, briefly")
-    assert prompt.index("Rules you must follow") < prompt.index("Today's date")
-
-
-def test_the_base_flow_cannot_be_used_without_filling_in_its_steps() -> None:
-    with pytest.raises(TypeError):
-        BaseDialogFlow(AgentSettings())  # type: ignore[abstract]

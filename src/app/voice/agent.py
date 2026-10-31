@@ -20,7 +20,7 @@ from typing import Any
 from livekit.agents import Agent, ModelSettings, RunContext, function_tool, llm
 
 from src.app.messages import filler_line
-from src.app.services.dialog.flow import BaseDialogFlow
+from src.app.services.dialog.flow import DialogFlow
 from src.app.services.dialog.tools import (
     CANCEL_BOOKING_SCHEMA,
     CHECK_AVAILABILITY_SCHEMA,
@@ -107,13 +107,13 @@ def _release(
 
 
 class BookingAgent(Agent):
-    def __init__(self, flow: BaseDialogFlow, tools: BookingTools) -> None:
+    def __init__(self, flow: DialogFlow, tools: BookingTools) -> None:
         super().__init__(instructions=flow.system_prompt())
         self._flow = flow
         self._booking_tools = tools
 
     @property
-    def flow(self) -> BaseDialogFlow:
+    def flow(self) -> DialogFlow:
         return self._flow
 
     async def llm_node(
