@@ -229,30 +229,41 @@ _SPAN_ATTRIBUTES: Final[dict[str, str]] = {
 }
 
 
-def _traced(
-    method: Callable[["BookingTools", dict[str, Any]], Awaitable[dict[str, Any]]],
-) -> Callable[["BookingTools", dict[str, Any]], Awaitable[dict[str, Any]]]:
-    """A `tool.<name>` span under the framework's function_tool span.
+_Tool = Callable[["BookingTools", dict[str, Any]], Awaitable[dict[str, Any]]]
 
-    Ours, because function_tool only knows the raw arguments and the rendered
-    output; the result code and the ops-core call are what an incident needs.
+
+def _tool[A: BaseModel](model: type[A]) -> Callable[[Callable[["BookingTools", A], Awaitable[dict[str, Any]]]], _Tool]:
+    """Turn a method taking validated `model` arguments into a tool taking raw ones.
+
+    The wrapper opens a `tool.<name>` span under the framework's function_tool
+    span (function_tool only knows the raw arguments and the rendered output;
+    the result code and the ops-core call are what an incident needs), parses the
+    arguments inside it, and runs the body under `_guarded`.
     """
-    name = f"tool.{method.__name__}"
 
-    @functools.wraps(method)
-    async def traced(self: "BookingTools", raw: dict[str, Any]) -> dict[str, Any]:
-        with _tracer.start_as_current_span(name) as span:
-            started = perf_counter()
-            result = await method(self, raw)
-            if self._stats:
-                self._stats.on_tool(method.__name__, result, perf_counter() - started)
-            span.set_attribute("booking.result", "ok" if result["ok"] else result["reason"])
-            for key in ("options", "bookings"):
-                if key in result:
-                    span.set_attribute("booking.results.count", len(result[key]))
-            return result
+    def decorate(method: Callable[["BookingTools", A], Awaitable[dict[str, Any]]]) -> _Tool:
+        name = f"tool.{method.__name__}"
 
-    return traced
+        @functools.wraps(method)
+        async def tool(self: "BookingTools", raw: dict[str, Any]) -> dict[str, Any]:
+            with _tracer.start_as_current_span(name) as span:
+                started = perf_counter()
+                args = self._parse(model, raw)
+                if args is None:
+                    result = self._failure("invalid_arguments")
+                else:
+                    result = await self._guarded(method(self, args))
+                if self._stats:
+                    self._stats.on_tool(method.__name__, result, perf_counter() - started)
+                span.set_attribute("booking.result", "ok" if result["ok"] else result["reason"])
+                for key in ("options", "bookings"):
+                    if key in result:
+                        span.set_attribute("booking.results.count", len(result[key]))
+                return result
+
+        return tool
+
+    return decorate
 
 
 class BookingTools:
@@ -284,91 +295,52 @@ class BookingTools:
     def language(self) -> str:
         return self._settings.language
 
-    @_traced
-    async def check_availability(self, raw: dict[str, Any]) -> dict[str, Any]:
-        args = self._parse(CheckAvailabilityArgs, raw)
-        if args is None:
-            return self._failure("invalid_arguments")
-
+    @_tool(CheckAvailabilityArgs)
+    async def check_availability(self, args: CheckAvailabilityArgs) -> dict[str, Any]:
         rejection = self._reject_unbookable(args.booking_date, args.party_size)
         if rejection is not None:
             return rejection
+        offers = await self._reservations.find_offers(
+            self._state, args.booking_date, args.party_size, args.preferred_time
+        )
+        if not offers:
+            return {"ok": True, "options": [], "say": phrase(self.language, "no_slots")}
+        logger.info(
+            "Offered %d slots",
+            len(offers),
+            extra={"room_id": self._state.room_id, "times": ReservationService.describe(offers)},
+        )
+        return {"ok": True, "options": [self._render_offer(offer) for offer in offers]}
 
-        async def run() -> dict[str, Any]:
-            offers = await self._reservations.find_offers(
-                self._state, args.booking_date, args.party_size, args.preferred_time
-            )
-            if not offers:
-                return {"ok": True, "options": [], "say": phrase(self.language, "no_slots")}
-            logger.info(
-                "Offered %d slots",
-                len(offers),
-                extra={"room_id": self._state.room_id, "times": ReservationService.describe(offers)},
-            )
-            return {"ok": True, "options": [self._render_offer(offer) for offer in offers]}
-
-        return await self._guarded(run)
-
-    @_traced
-    async def create_booking(self, raw: dict[str, Any]) -> dict[str, Any]:
-        args = self._parse(CreateBookingArgs, raw)
-        if args is None:
-            return self._failure("invalid_arguments")
+    @_tool(CreateBookingArgs)
+    async def create_booking(self, args: CreateBookingArgs) -> dict[str, Any]:
         if not args.confirmed:
             # The gate is not decoration. A table taken off a misheard "yes" is
             # a table the venue holds for someone who is not coming.
             return self._failure("not_confirmed")
+        summary = await self._reservations.reserve(self._state, args.slot_ref, args.guest_name.strip(), args.party_size)
+        logger.info("Booking created", extra={"room_id": self._state.room_id, "booking_ref": summary.ref})
+        return {"ok": True, "booking": self._render_booking(summary)}
 
-        async def run() -> dict[str, Any]:
-            summary = await self._reservations.reserve(
-                self._state, args.slot_ref, args.guest_name.strip(), args.party_size
-            )
-            logger.info(
-                "Booking created",
-                extra={"room_id": self._state.room_id, "booking_ref": summary.ref},
-            )
-            return {"ok": True, "booking": self._render_booking(summary)}
+    @_tool(FindBookingArgs)
+    async def find_booking(self, args: FindBookingArgs) -> dict[str, Any]:
+        summaries = await self._reservations.find_existing(
+            self._state, args.guest_name.strip(), args.booking_date, args.booking_code
+        )
+        if not summaries:
+            # The date goes back to the guest: a nil result for a misheard date is
+            # indistinguishable from no booking unless they hear which day was searched.
+            say = phrase(self.language, "booking_not_found_on_date", date=spoken_date(self.language, args.booking_date))
+            return {"ok": True, "bookings": [], "say": say}
+        return {"ok": True, "bookings": [self._render_booking(item) for item in summaries]}
 
-        return await self._guarded(run)
-
-    @_traced
-    async def find_booking(self, raw: dict[str, Any]) -> dict[str, Any]:
-        args = self._parse(FindBookingArgs, raw)
-        if args is None:
-            return self._failure("invalid_arguments")
-
-        async def run() -> dict[str, Any]:
-            summaries = await self._reservations.find_existing(
-                self._state, args.guest_name.strip(), args.booking_date, args.booking_code
-            )
-            if not summaries:
-                # The date goes back to the guest: a nil result for a misheard date is
-                # indistinguishable from no booking unless they hear which day was searched.
-                say = phrase(
-                    self.language, "booking_not_found_on_date", date=spoken_date(self.language, args.booking_date)
-                )
-                return {"ok": True, "bookings": [], "say": say}
-            return {"ok": True, "bookings": [self._render_booking(item) for item in summaries]}
-
-        return await self._guarded(run)
-
-    @_traced
-    async def cancel_booking(self, raw: dict[str, Any]) -> dict[str, Any]:
-        args = self._parse(CancelBookingArgs, raw)
-        if args is None:
-            return self._failure("invalid_arguments")
+    @_tool(CancelBookingArgs)
+    async def cancel_booking(self, args: CancelBookingArgs) -> dict[str, Any]:
         if not args.confirmed:
             return self._failure("not_confirmed")
-
-        async def run() -> dict[str, Any]:
-            summary = await self._reservations.cancel(self._state, args.booking_ref)
-            logger.info(
-                "Booking cancelled",
-                extra={"room_id": self._state.room_id, "booking_ref": summary.ref},
-            )
-            return {"ok": True, "cancelled": self._render_booking(summary)}
-
-        return await self._guarded(run)
+        summary = await self._reservations.cancel(self._state, args.booking_ref)
+        logger.info("Booking cancelled", extra={"room_id": self._state.room_id, "booking_ref": summary.ref})
+        return {"ok": True, "cancelled": self._render_booking(summary)}
 
     # ----------------------------------------------------------------------
     def _reject_unbookable(self, booking_date: date, party_size: int) -> dict[str, Any] | None:
@@ -382,8 +354,8 @@ class BookingTools:
             return self._failure("date_too_far")
         return None
 
-    async def _guarded(self, run: Callable[[], Awaitable[dict[str, Any]]]) -> dict[str, Any]:
-        """Run a dispatch, converting any domain failure into something sayable.
+    async def _guarded(self, call: Awaitable[dict[str, Any]]) -> dict[str, Any]:
+        """Await a tool body, converting any domain failure into something sayable.
 
         BookingError carries the error_code that phrases are keyed by, so a new
         failure mode gets its sentence by adding one entry, not by editing four
@@ -394,7 +366,7 @@ class BookingTools:
             # hung ops-core; on a phone call that reads as a dropped line. Past
             # the ceiling the guest hears the outage sentence instead.
             async with asyncio.timeout(self._settings.tool_wait_seconds):
-                return await run()
+                return await call
         except TimeoutError:
             logger.warning(
                 "Tool call exceeded %.1f s",
@@ -416,7 +388,7 @@ class BookingTools:
             logger.exception("Unexpected tool failure", extra={"room_id": self._state.room_id})
             return self._failure("booking_error")
 
-    def _parse(self, model: type[BaseModel], raw: dict[str, Any]) -> Any:
+    def _parse[A: BaseModel](self, model: type[A], raw: dict[str, Any]) -> A | None:
         try:
             args = model.model_validate(raw)
         except ValidationError as exc:
