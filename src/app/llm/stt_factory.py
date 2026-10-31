@@ -23,7 +23,6 @@ HTTP process never imports ctranslate2 and a machine without one provider's
 dependency can still use another.
 """
 
-from collections.abc import Sequence
 from logging import getLogger
 from typing import Any
 
@@ -51,7 +50,7 @@ def create_stt(settings: STTSettings, language: str, vad: vad_module.VAD | None 
 
     fallback = _build_one(settings.fallback_provider, settings, language)
     logger.info("STT fallback enabled: %s -> %s", settings.provider, settings.fallback_provider)
-    return ServingSTTAdapter(_dedupe([primary, fallback]), vad=vad)
+    return ServingSTTAdapter([primary, fallback], vad=vad)
 
 
 def _build_one(provider: STTProvider, settings: STTSettings, language: str) -> stt.STT[Any]:
@@ -106,12 +105,3 @@ def _build_one(provider: STTProvider, settings: STTSettings, language: str) -> s
         return WhisperStreamSTTClient(settings, language, model)
 
     raise ValueError(f"Unsupported STT provider: {provider}")
-
-
-def _dedupe(clients: Sequence[stt.STT[Any]]) -> list[stt.STT[Any]]:
-    """Guard against a fallback that is really the same object as the primary."""
-    seen: list[stt.STT[Any]] = []
-    for client in clients:
-        if all(client is not existing for existing in seen):
-            seen.append(client)
-    return seen

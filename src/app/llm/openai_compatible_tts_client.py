@@ -12,16 +12,11 @@ third provider changes two files that exist for choosing providers, and no
 other line of this service.
 """
 
-from logging import getLogger
 from typing import Any, Literal, cast
 
 from livekit.agents import APIConnectionError, tts, utils
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 from openai import AsyncOpenAI, OpenAIError
-
-from src.app.core.settings.tts import TTSSettings
-
-logger = getLogger(__name__)
 
 _NUM_CHANNELS = 1
 # PCM rather than mp3: the pipeline wants raw samples, and asking for a
@@ -32,13 +27,12 @@ _PCM_SAMPLE_RATE = 24000
 
 
 class OpenAICompatibleTTSClient(tts.TTS[Any]):
-    def __init__(self, settings: TTSSettings, model: str, voice: str, client: AsyncOpenAI) -> None:
+    def __init__(self, model: str, voice: str, client: AsyncOpenAI) -> None:
         super().__init__(
             capabilities=tts.TTSCapabilities(streaming=False),
             sample_rate=_PCM_SAMPLE_RATE,
             num_channels=_NUM_CHANNELS,
         )
-        self._settings = settings
         self._model = model
         self._voice = voice
         self._client = client
@@ -62,10 +56,6 @@ class OpenAICompatibleTTSClient(tts.TTS[Any]):
     @property
     def voice(self) -> str:
         return self._voice
-
-    @property
-    def settings(self) -> TTSSettings:
-        return self._settings
 
     @property
     def client(self) -> AsyncOpenAI:

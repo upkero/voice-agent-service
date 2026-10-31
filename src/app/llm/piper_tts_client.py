@@ -9,7 +9,6 @@ contract has been stable for years.
 """
 
 import asyncio
-from logging import getLogger
 from pathlib import Path
 from typing import Any, cast
 
@@ -17,8 +16,6 @@ from livekit.agents import APIConnectionError, tts, utils
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 
 from src.app.core.settings.tts import TTSSettings
-
-logger = getLogger(__name__)
 
 _NUM_CHANNELS = 1
 

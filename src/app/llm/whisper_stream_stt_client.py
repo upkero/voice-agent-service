@@ -20,7 +20,6 @@ handshake needs a running server (`docker compose --profile selfhost-stt up`).
 
 import asyncio
 import json
-from logging import getLogger
 from typing import Any
 from uuid import uuid4
 
@@ -33,8 +32,6 @@ from websockets.asyncio.client import ClientConnection
 
 from src.app.core.settings.stt import STTSettings
 
-logger = getLogger(__name__)
-
 # WhisperLive consumes 16 kHz mono float32. The base SpeechStream is told this
 # rate so livekit resamples every incoming frame before _run sees it.
 _WHISPERLIVE_SAMPLE_RATE = 16000
@@ -45,7 +42,6 @@ class WhisperStreamSTTClient(stt.STT[Any]):
         # streaming=True is the whole point: it puts the session on the live
         # path (stream()) instead of the VAD-buffered recognize() path.
         super().__init__(capabilities=stt.STTCapabilities(streaming=True, interim_results=True))
-        self._settings = settings
         self._language = settings.language or language
         if not settings.whisper_stream_url:
             raise ValueError("STT_WHISPER_STREAM_URL is required for the whisper_stream provider.")

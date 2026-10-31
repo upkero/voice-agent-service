@@ -63,7 +63,6 @@ class DialogSessionState:
         answer that is now stale, and keeping them alive would let the model
         accept an offer it made two questions ago.
         """
-        self._slots.clear()
         offers = [SlotOffer(ref=f"slot_{index}", slot=slot) for index, slot in enumerate(slots, start=1)]
         self._slots = {offer.ref: offer.slot for offer in offers}
         return offers
@@ -73,9 +72,6 @@ class DialogSessionState:
         if slot is None:
             raise UnknownReferenceError(f"Slot reference '{ref}' was not offered in this conversation.")
         return slot
-
-    def slot_refs(self) -> list[str]:
-        return list(self._slots)
 
     def register_booking(
         self,

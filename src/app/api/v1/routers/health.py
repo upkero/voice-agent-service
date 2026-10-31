@@ -1,10 +1,6 @@
-from logging import getLogger
-
 from fastapi import APIRouter, HTTPException
 
 from src.app.api.v1.dependencies import LiveKitGatewayDep
-
-logger = getLogger(__name__)
 
 router = APIRouter(prefix="/health", tags=["infra"])
 

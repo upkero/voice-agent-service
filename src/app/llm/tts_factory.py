@@ -74,7 +74,7 @@ def _build_one(
         )
         # A cloud voice name is not a piper voice name, so the default map is not
         # consulted here; the provider's own voice must be set explicitly.
-        return OpenAICompatibleTTSClient(settings, model, settings.voice or "alloy", client)
+        return OpenAICompatibleTTSClient(model, settings.voice or "alloy", client)
 
     if provider == "cartesia":
         from livekit.plugins import cartesia
