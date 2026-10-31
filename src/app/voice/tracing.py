@@ -90,7 +90,7 @@ class CollapsingSpanProcessor(SpanProcessor):
 def setup_worker_tracing() -> TracerProvider:
     """`setup_tracing`, with the export going through CollapsingSpanProcessor.
 
-    setup_tracing (CANON C19, copied verbatim) attaches a plain exporter whenever
+    setup_tracing (the same file in every service) attaches a plain exporter whenever
     OTEL_EXPORTER_OTLP_ENDPOINT is set, so the variable is hidden from it for the
     one call and the worker attaches its own.
     """
