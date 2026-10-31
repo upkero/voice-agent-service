@@ -7,10 +7,10 @@ accident of a shared "audio provider" switch.
 
 Four providers, two of them true streaming:
 
-    faster_whisper     local batch      (own STTClient, offline)
-    openai_compatible  batch REST       (own STTClient, OpenRouter/OpenAI)
+    faster_whisper     local batch      (own stt.STT, offline)
+    openai_compatible  batch REST       (own stt.STT, OpenRouter/OpenAI)
     deepgram           streaming WS     (the livekit plugin, used directly)
-    whisper_stream     streaming WS     (own STTClient -> self-hosted WhisperLive)
+    whisper_stream     streaming WS     (own stt.STT -> self-hosted WhisperLive)
 
 Whether a provider streams is not decided here and not branched on anywhere in
 the app: each client declares STTCapabilities(streaming=...), and the session

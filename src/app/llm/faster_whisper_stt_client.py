@@ -16,7 +16,6 @@ from livekit.agents.language import LanguageCode
 from livekit.agents.types import NOT_GIVEN, APIConnectOptions
 
 from src.app.core.settings.stt import STTSettings
-from src.app.interfaces.llm.stt_client import STTClient
 from src.app.messages import stt_vocabulary
 
 logger = getLogger(__name__)
@@ -34,7 +33,7 @@ def load_model(name: str, compute_type: str) -> Any:
     return WhisperModel(name, device="cpu", compute_type=compute_type)
 
 
-class FasterWhisperSTTClient(STTClient):
+class FasterWhisperSTTClient(stt.STT[Any]):
     def __init__(self, settings: STTSettings, language: str, model: str) -> None:
         # streaming=False: Whisper transcribes a finished utterance, it does not
         # emit partials. Declaring that truthfully matters — the session wraps a

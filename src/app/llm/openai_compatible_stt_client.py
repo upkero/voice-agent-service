@@ -13,6 +13,7 @@ them would be new code whose only distinction is being less tested.
 import io
 import wave
 from logging import getLogger
+from typing import Any
 
 from livekit.agents import APIConnectionError, NotGivenOr, stt, utils
 from livekit.agents.language import LanguageCode
@@ -20,12 +21,11 @@ from livekit.agents.types import NOT_GIVEN, APIConnectOptions
 from openai import AsyncOpenAI, OpenAIError
 
 from src.app.core.settings.stt import STTSettings
-from src.app.interfaces.llm.stt_client import STTClient
 
 logger = getLogger(__name__)
 
 
-class OpenAICompatibleSTTClient(STTClient):
+class OpenAICompatibleSTTClient(stt.STT[Any]):
     def __init__(self, settings: STTSettings, language: str, model: str, client: AsyncOpenAI) -> None:
         super().__init__(capabilities=stt.STTCapabilities(streaming=False, interim_results=False))
         self._settings = settings

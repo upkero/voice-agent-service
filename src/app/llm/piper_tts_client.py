@@ -11,20 +11,19 @@ contract has been stable for years.
 import asyncio
 from logging import getLogger
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from livekit.agents import APIConnectionError, tts, utils
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 
 from src.app.core.settings.tts import TTSSettings
-from src.app.interfaces.llm.tts_client import TTSClient
 
 logger = getLogger(__name__)
 
 _NUM_CHANNELS = 1
 
 
-class PiperTTSClient(TTSClient):
+class PiperTTSClient(tts.TTS[Any]):
     def __init__(self, settings: TTSSettings, voice: str) -> None:
         # streaming=False: piper synthesises a whole utterance per invocation.
         # The session splits long replies into sentences on its own, which is

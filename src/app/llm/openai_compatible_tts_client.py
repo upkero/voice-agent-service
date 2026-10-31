@@ -6,21 +6,20 @@ OpenRouter to OpenAI to a local server is a value in .env.
 
 Note what this is *not*. A provider with its own request shape — Cartesia, say —
 is not "OpenAI-compatible" merely because it also returns audio. It belongs in
-its own class implementing the same TTSClient port, added alongside this one
+its own tts.TTS subclass, added alongside this one
 and selected by a new branch in the factory. That is the Open/Closed part: a
 third provider changes two files that exist for choosing providers, and no
 other line of this service.
 """
 
 from logging import getLogger
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from livekit.agents import APIConnectionError, tts, utils
 from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions
 from openai import AsyncOpenAI, OpenAIError
 
 from src.app.core.settings.tts import TTSSettings
-from src.app.interfaces.llm.tts_client import TTSClient
 
 logger = getLogger(__name__)
 
@@ -32,7 +31,7 @@ _RESPONSE_FORMAT: Literal["pcm"] = "pcm"
 _PCM_SAMPLE_RATE = 24000
 
 
-class OpenAICompatibleTTSClient(TTSClient):
+class OpenAICompatibleTTSClient(tts.TTS[Any]):
     def __init__(self, settings: TTSSettings, model: str, voice: str, client: AsyncOpenAI) -> None:
         super().__init__(
             capabilities=tts.TTSCapabilities(streaming=False),

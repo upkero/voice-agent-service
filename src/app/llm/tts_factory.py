@@ -2,13 +2,13 @@
 
 Three providers:
 
-    piper              local binary     (own TTSClient, offline)
-    openai_compatible  batch REST       (own TTSClient, OpenRouter/OpenAI)
+    piper              local binary     (own tts.TTS, offline)
+    openai_compatible  batch REST       (own tts.TTS, OpenRouter/OpenAI)
     cartesia           streaming WS     (the livekit plugin, used directly)
 
-Adding a provider is a branch here plus, only if it is not already an
-stt/tts.TTS, a class implementing the TTSClient port. Cartesia's plugin already
-is a tts.TTS, so it is constructed directly. Nothing in services/, voice/ or
+Adding a provider is a branch here plus, only if it is not already a
+tts.TTS, a class subclassing it. Cartesia's plugin already is a tts.TTS,
+so it is constructed directly. Nothing in services/, voice/ or
 api/ names a provider — grep the tree for "cartesia" and it appears only here
 and in settings. That is the Open/Closed claim, and it is checkable.
 """

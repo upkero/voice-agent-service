@@ -32,7 +32,6 @@ from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN, APIConn
 from websockets.asyncio.client import ClientConnection
 
 from src.app.core.settings.stt import STTSettings
-from src.app.interfaces.llm.stt_client import STTClient
 
 logger = getLogger(__name__)
 
@@ -41,7 +40,7 @@ logger = getLogger(__name__)
 _WHISPERLIVE_SAMPLE_RATE = 16000
 
 
-class WhisperStreamSTTClient(STTClient):
+class WhisperStreamSTTClient(stt.STT[Any]):
     def __init__(self, settings: STTSettings, language: str, model: str) -> None:
         # streaming=True is the whole point: it puts the session on the live
         # path (stream()) instead of the VAD-buffered recognize() path.
