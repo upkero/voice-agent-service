@@ -15,9 +15,11 @@ model is allowed to send should be written down where it can be read.
 
 import re
 from collections.abc import AsyncIterable, AsyncIterator, Callable
+from logging import getLogger
 from typing import Any
 
 from livekit.agents import Agent, ModelSettings, RunContext, function_tool, llm
+from opentelemetry import trace
 
 from src.app.messages import filler_line
 from src.app.services.dialog.flow import DialogFlow
@@ -26,8 +28,11 @@ from src.app.services.dialog.tools import (
     CHECK_AVAILABILITY_SCHEMA,
     CREATE_BOOKING_SCHEMA,
     FIND_BOOKING_SCHEMA,
+    TOOL_PROMPT_IDS,
     BookingTools,
 )
+
+logger = getLogger(__name__)
 
 # The opening line is played from cached audio before the model says anything,
 # and however the prompt puts it, a guest's "hello" still draws a hello back now
@@ -111,6 +116,7 @@ class BookingAgent(Agent):
         super().__init__(instructions=flow.system_prompt())
         self._flow = flow
         self._booking_tools = tools
+        self._prompt_ids = [*flow.prompt_ids, *TOOL_PROMPT_IDS]
 
     @property
     def flow(self) -> DialogFlow:
@@ -119,6 +125,10 @@ class BookingAgent(Agent):
     async def llm_node(
         self, chat_ctx: llm.ChatContext, tools: list[llm.Tool], model_settings: ModelSettings
     ) -> AsyncIterator[llm.ChatChunk | str | Any]:
+        # The ids pin a reply to the exact prompt wording that produced it. Debug,
+        # not info: one line per model request, read only when chasing one call.
+        trace.get_current_span().set_attribute("voice.prompt_ids", self._prompt_ids)
+        logger.debug("Sending the system prompt set", extra={"prompt_ids": self._prompt_ids})
         async for chunk in without_leading_greeting(Agent.default.llm_node(self, chat_ctx, tools, model_settings)):
             yield chunk
 

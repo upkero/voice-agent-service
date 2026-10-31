@@ -24,6 +24,7 @@ from src.app.llm.factory import create_llm
 from src.app.llm.stt_factory import create_stt
 from src.app.llm.tts_factory import create_tts
 from src.app.messages import degradation_message
+from src.app.prompts import get_prompt
 from src.app.services.dialog.session_state import DialogSessionState
 from src.app.services.dialog.tools import BookingTools
 from src.app.voice.agent import BookingAgent
@@ -195,6 +196,7 @@ async def greet(
             # Made ahead of the call, so the first words start at once.
             await session.say(text, audio=replay(frames))
         else:
+            logger.debug("Generating the greeting", extra={"prompt_ids": [get_prompt("greeting").id]})
             await session.generate_reply(instructions=agent.flow.greeting())
     except Exception:
         logger.exception("Could not deliver the greeting by voice")

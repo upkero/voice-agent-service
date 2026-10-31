@@ -31,6 +31,10 @@ class DialogFlow:
             "reply_language": _LANGUAGE_NAMES.get(self._settings.language, "English"),
         }
 
+    @property
+    def prompt_ids(self) -> tuple[str, ...]:
+        return tuple(get_prompt(name).id for name in _SECTIONS)
+
     def system_prompt(self) -> str:
         # Today's date is stated because a model cannot know it, and a guest says
         # "tomorrow" within the first ten seconds.

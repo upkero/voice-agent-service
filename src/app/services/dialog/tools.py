@@ -58,6 +58,10 @@ class ToolOutcomes(Protocol):
     def note_guest(self, fingerprint: str) -> None: ...
 
 
+# The id of every tool prompt the schemas below were built from.
+TOOL_PROMPT_IDS: Final[list[str]] = []
+
+
 def _text(name: str) -> str:
     """Every string below that the model reads comes from prompts/.
 
@@ -65,7 +69,9 @@ def _text(name: str) -> str:
     JSON Schema. Leaving it inline would mean half the instructions this agent
     sends live in prompts/ and the other half in a dict literal.
     """
-    return get_prompt(name).text
+    prompt = get_prompt(name)
+    TOOL_PROMPT_IDS.append(prompt.id)
+    return prompt.text
 
 
 # --------------------------------------------------------------------------

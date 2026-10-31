@@ -1,8 +1,14 @@
+import logging
 from collections.abc import AsyncIterator
 
-from livekit.agents import llm
+import pytest
+from livekit.agents import Agent, ModelSettings, llm
 
-from src.app.voice.agent import drop_greeting, without_leading_greeting
+from src.app.core.settings.agent import AgentSettings
+from src.app.prompts import get_prompt
+from src.app.services.dialog.flow import DialogFlow
+from src.app.services.dialog.tools import BookingTools
+from src.app.voice.agent import BookingAgent, drop_greeting, without_leading_greeting
 
 
 def _chunk(text: str) -> llm.ChatChunk:
@@ -54,3 +60,21 @@ async def test_tool_call_chunks_pass_through() -> None:
 
 async def test_a_greeting_in_its_own_chunk_leaves_no_gap() -> None:
     assert await _text("Добрый день!", " чем могу ", "помочь?") == "Чем могу помочь?"
+
+
+async def test_each_model_request_logs_the_prompt_ids(
+    tools: BookingTools, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    async def fake_llm_node(*_: object) -> AsyncIterator[llm.ChatChunk]:
+        yield _chunk("Which date?")
+
+    monkeypatch.setattr(Agent.default, "llm_node", fake_llm_node)
+    agent = BookingAgent(DialogFlow(AgentSettings(_env_file=None)), tools)
+
+    with caplog.at_level(logging.DEBUG, logger="src.app.voice.agent"):
+        async for _ in agent.llm_node(llm.ChatContext(), [], ModelSettings()):
+            pass
+
+    ids = next(r for r in caplog.records if r.getMessage() == "Sending the system prompt set").prompt_ids
+    assert get_prompt("persona").id in ids
+    assert get_prompt("tool_create_booking").id in ids
